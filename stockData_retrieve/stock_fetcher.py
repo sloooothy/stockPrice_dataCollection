@@ -80,9 +80,13 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
   print(f"Requesting TWSE market summary for {target_date}...")
   
   try:
-    headers = {'User-Agent': 'Mozilla/5.0'} 
+    #使用更完整的 User-Agent 字串
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.twse.com.tw/' # 加上 Referer 模擬從 TWSE 網頁點擊過去
+    } 
     response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    response.raise_for_status() # Raise exception for bad status codes
     data = response.json()
     
     if 'data9' not in data or not data['data9']:
