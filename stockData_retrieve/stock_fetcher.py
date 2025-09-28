@@ -47,20 +47,9 @@ def is_trading_day(target_date: datetime) -> bool:
 def find_last_trading_day(current_date: datetime) -> datetime:
   """
   Finds the most recent trading day using the holidays library.
-  
-  Args:
-    current_date: The date to start the check from.
-    
-  Returns:
-    The datetime object of the last trading day.
   """
-  # Start checking backwards from the current date (inclusive)
   target_date = current_date
   
-  # Note: The logic starts checking from the current date and finds the *previous* trading day 
-  # if the current day is not a trading day.
-  
-  # Iterate backwards until a trading day is found
   while not is_trading_day(target_date):
     target_date -= timedelta(days=1)
     
@@ -80,15 +69,16 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
   print(f"Requesting TWSE market summary for {target_date}...")
   
   try:
-    #使用更完整的 User-Agent 字串
+    # 強化 User-Agent 與 Referer，避免被伺服器過濾
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.twse.com.tw/' # 加上 Referer 模擬從 TWSE 網頁點擊過去
+        'Referer': 'https://www.twse.com.tw/' 
     } 
     response = requests.get(url, headers=headers)
-    response.raise_for_status() # Raise exception for bad status codes
+    response.raise_for_status()
     data = response.json()
     
+    # 檢查 JSON 回傳的資料內容是否為空
     if 'data9' not in data or not data['data9']:
       print(f"Warning: TWSE returned no trading data.")
       return pd.DataFrame()
@@ -124,24 +114,30 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
 
 def save_to_sqlite(df: pd.DataFrame, target_date: datetime):
   """
-  Saves the DataFrame to the date-stamped SQLite file in the defined folder.
+  Saves the DataFrame to the date-stamped SQLite file in the defined folder, 
+  using an absolute path for reliability in GitHub Actions.
   """
   if df.empty:
     print("DataFrame is empty. Skipping save operation.")
     return
 
   date_str = target_date.strftime('%Y%m%d')
-  # Critical modification: Specify the DATA_FOLDER for correct output path
-  db_file_path = os.path.join(DATA_FOLDER, f"stock_data_{date_str}.db")
   
-  # Ensure the directory exists (important for GitHub Actions)
+  # 確保資料夾存在
   os.makedirs(DATA_FOLDER, exist_ok=True)
   
-  engine = create_engine(f"sqlite:///{db_file_path}")
+  # 使用絕對路徑，確保 SQLite 知道在哪裡創建檔案
+  db_file_path_rel = os.path.join(DATA_FOLDER, f"stock_data_{date_str}.db")
+  db_file_path_abs = os.path.abspath(db_file_path_rel)
+  
+  print(f"DEBUG: Calculated ABSOLUTE Path: {db_file_path_abs}") 
+  
+  # 使用絕對路徑連接資料庫
+  engine = create_engine(f"sqlite:///{db_file_path_abs}")
   df.to_sql(TABLE_NAME, engine, if_exists='replace', index=False)
   
   print(f"--- Save Complete ---")
-  print(f"New file saved: '{db_file_path}'.")
+  print(f"New file saved successfully at: '{db_file_path_abs}'.")
 
 # --- MAIN ORCHESTRATION ---
 
@@ -156,18 +152,22 @@ def main():
   # Data is usually available after 16:00 TST (4:00 PM)
   CUTOFF_TIME = now_tst.replace(hour=16, minute=0, second=0, microsecond=0)
   
+  # 偵錯：打印環境時間
+  print(f"\n--- DEBUG: Environment Time Check ---")
+  print(f"Action Runner Time (UTC): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+  print(f"Taipei Time (TST): {now_tst.strftime('%Y-%m-%d %H:%M:%S')}")
+  print(f"Is past 4 PM TST: {now_tst >= CUTOFF_TIME}")
+  print(f"Is today a trading day: {is_trading_day(today_tst)}")
+
   target_fetch_date = None
   
-  # Determine the actual date we should be checking and fetching for
+  # 決定要檢查和擷取的目標日期
   if is_trading_day(today_tst) and now_tst >= CUTOFF_TIME:
-    # Scenario A: Trading day and past 4 PM (data should be available for today)
-    target_check_date = today_tst
+    target_check_date = today_tst # 情境 A: 交易日且已過收盤後
   elif is_trading_day(today_tst) and now_tst < CUTOFF_TIME:
-    # Scenario B: Trading day but before 4 PM (fetch yesterday's data if missing)
-    target_check_date = find_last_trading_day(today_tst - timedelta(days=1))
+    target_check_date = find_last_trading_day(today_tst - timedelta(days=1)) # 情境 B: 交易日但未收盤
   else:
-    # Scenario C: Non-Trading Day (fetch last trading day's data)
-    target_check_date = find_last_trading_day(today_tst)
+    target_check_date = find_last_trading_day(today_tst) # 情境 C: 非交易日
     
   # --- Fetching Logic ---
   
@@ -177,7 +177,6 @@ def main():
   else:
     print(f"Data for {target_check_date.strftime('%Y-%m-%d')} not found. Initiating fetch.")
     
-    # Check if the target date is in the future (Should not happen with current logic, but safety check)
     if target_check_date.date() > now_tst.date():
         print("Error: Target date is in the future. Aborting fetch.")
         final_output_date = find_last_trading_day(now_tst)
