@@ -83,10 +83,39 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
     if 'tables' in data and data['tables']:
         raw_data=data['tables'][8]
         fields=raw_data['fields'] #取得data欄位
+        print(fields)
         stock_data=raw_data['data']
 
         # 3. 將清單資料和欄位名稱轉換成 DataFrame
         df = pd.DataFrame(stock_data, columns=fields)
+        # --- 關鍵修正：Data Cleaning and Normalization ---
+        # 這裡的步驟確保了 'Stock_ID', 'Close_Price', 'Volume' 這些欄位會被正確建立。
+        
+        # 找出需要清理逗號和轉型的數值欄位
+        numeric_cols_to_clean = ['證券代號', '證券名稱', '成交股數', '成交筆數', 
+                                 '成交金額', '開盤價', '最高價', '最低價', '收盤價', 
+                                 '漲跌(+/-)', '漲跌價差', '最後揭示買價', '最後揭示買量', 
+                                 '最後揭示賣價', '最後揭示賣量', '本益比']
+        
+        for col in numeric_cols_to_clean:
+          if col in df.columns:
+            # Remove commas, clean up non-numeric strings, and convert to numeric
+            df[col] = df[col].astype(str).str.replace(',', '').str.replace('--', '0').str.replace('-', '0').str.strip()
+            df[col] = pd.to_numeric(df[col], errors='coerce') 
+
+        # 插入交易日期
+        date_formatted = datetime.strptime(target_date, '%Y%m%d').strftime('%Y-%m-%d')
+        df.insert(0, 'Trade_Date', date_formatted)
+        
+        # 重新命名欄位 (這是讓 main 函數成功的關鍵)
+        df.rename(columns={'證券代號': 'Stock_ID', '收盤價': 'Close_Price', '成交股數': 'Volume'}, inplace=True)
+        
+        # 處理成交量，確保是整數且空值為 0
+        df['Volume'] = df['Volume'].fillna(0).astype(int)
+        # 過濾，只保留四位數字的股票代號
+        df = df[df['Stock_ID'].astype(str).str.match(r'^\d{4}$')]
+        
+        print(f"Successfully processed and cleaned {len(df)} valid records.")
         return df
 
     else:
@@ -126,9 +155,9 @@ def save_to_sqlite(df: pd.DataFrame, target_date: datetime):
   print(f"New file saved successfully at: '{db_file_path_abs}'.")
   
   # 額外加入 CSV 儲存 (根據你的要求)
-  csv_file_path = os.path.join(DATA_FOLDER, f"stock_data_{date_str}.csv")
-  df.to_csv(csv_file_path, index=False, encoding='utf-8-sig')
-  print(f"CSV file saved successfully at: '{csv_file_path}'.")
+  #csv_file_path = os.path.join(DATA_FOLDER, f"stock_data_{date_str}.csv")
+  #df.to_csv(csv_file_path, index=False, encoding='utf-8-sig')
+  #print(f"CSV file saved successfully at: '{csv_file_path}'.")
 
 # --- MAIN ORCHESTRATION ---
 
