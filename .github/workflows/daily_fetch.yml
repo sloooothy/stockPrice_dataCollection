@@ -6,6 +6,11 @@ on:
     - cron: '0 9 * * *'
   workflow_dispatch:
 
+# --- BEGIN MODIFICATION ---
+permissions:
+  contents: write # 賦予 GITHUB_TOKEN 寫入 (commit/push) 倉庫內容的權限
+# --- END MODIFICATION ---
+
 jobs:
   fetch_and_commit:
     runs-on: ubuntu-latest
