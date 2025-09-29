@@ -3,4 +3,4 @@ pandas
 requests
 sqlalchemy
 pytz
-holidays  # 新增：用於判斷台灣假日
+holidays

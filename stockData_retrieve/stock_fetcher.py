@@ -11,9 +11,10 @@ import holidays # Library for accurate holiday checking
 
 # Define constants
 TABLE_NAME = "twse_daily_price"
+# TWSE URL 取得所有股票的每日行情
 TWSE_URL = "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={date}&type=ALLBUT0999"
 # The folder where the script is running and files are stored
-DATA_FOLDER = "stockData_retrieve" 
+DATA_FOLDER = "stockData" 
 TZ_TAIPEI = pytz.timezone('Asia/Taipei')
 
 # Define Taiwan holidays instance once for efficiency
@@ -77,36 +78,21 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
-    
-    # 檢查 JSON 回傳的資料內容是否為空
-    if 'data9' not in data or not data['data9']:
-      print(f"Warning: TWSE returned no trading data.")
-      return pd.DataFrame()
-      
-    columns = data['fields9']
-    raw_data = data['data9']
-    df = pd.DataFrame(raw_data, columns=columns)
-    
-    # --- Data Cleaning and Normalization ---
-    numeric_cols_to_clean = [
-      '成交股數', '成交金額', '開盤價', '最高價', '最低價', '收盤價', 
-      '漲跌價差', '成交筆數'
-    ]
-    
-    for col in numeric_cols_to_clean:
-      if col in df.columns:
-        df[col] = df[col].astype(str).str.replace(',', '').str.strip()
-        df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    df.insert(0, 'Trade_Date', datetime.strptime(target_date, '%Y%m%d').strftime('%Y-%m-%d'))
-    df.rename(columns={'證券代號': 'Stock_ID', '收盤價': 'Close_Price', '成交股數': 'Volume'}, inplace=True)
+    # mother data
+    if 'tables' in data and data['tables']:
+        raw_data=data['tables'][8]
+        fields=raw_data['fields'] #取得data欄位
+        stock_data=raw_data['data']
+
+        # 3. 將清單資料和欄位名稱轉換成 DataFrame
+        df = pd.DataFrame(stock_data, columns=fields)
+        return df
+
+    else:
+       return pd.DataFrame()
     
-    df['Volume'] = df['Volume'].fillna(0).astype(int)
-    df = df[df['Stock_ID'].str.match(r'^\d{4}$')]
-    
-    print(f"Successfully fetched {len(df)} valid records.")
-    return df
-    
+
   except requests.RequestException as e:
     print(f"Error making request to TWSE: {e}")
     return pd.DataFrame()
@@ -138,6 +124,11 @@ def save_to_sqlite(df: pd.DataFrame, target_date: datetime):
   
   print(f"--- Save Complete ---")
   print(f"New file saved successfully at: '{db_file_path_abs}'.")
+  
+  # 額外加入 CSV 儲存 (根據你的要求)
+  csv_file_path = os.path.join(DATA_FOLDER, f"stock_data_{date_str}.csv")
+  df.to_csv(csv_file_path, index=False, encoding='utf-8-sig')
+  print(f"CSV file saved successfully at: '{csv_file_path}'.")
 
 # --- MAIN ORCHESTRATION ---
 
@@ -181,16 +172,24 @@ def main():
         print("Error: Target date is in the future. Aborting fetch.")
         final_output_date = find_last_trading_day(now_tst)
     else:
-        market_df = fetch_twse_daily_summary(target_check_date.strftime('%Y%m%d'))
+        # target_check_date 已經是 datetime 物件，轉成 YYYYMMDD 字串給 API
+        market_df = fetch_twse_daily_summary(target_check_date.strftime('%Y%m%d')) 
         if not market_df.empty:
             save_to_sqlite(market_df, target_check_date)
             
-            # Data Sample for printf practice
+            # Data Sample for printf practice (包含不同的型別：字串、浮點數、整數)
             print("\nData Sample (for struct & printf practice):")
-            sample = market_df.head(3)
-            print("Stock_ID | Close Price | Volume (Int)")
-            for _, row in sample.iterrows():
-                print(f"{row['Stock_ID']:<8} | {row['Close_Price']:<11.2f} | {row.get('Volume', 0):>10.0f}")
+            # 確保 'Close_Price' 和 'Volume' 存在且是正確的數字型別
+            if all(col in market_df.columns for col in ['Stock_ID', 'Close_Price', 'Volume']):
+                sample = market_df.head(3)
+                print("Stock_ID | Close Price | Volume (Int)")
+                # 使用你要求的 printf 格式字串練習
+                for _, row in sample.iterrows():
+                    # %-8s (左對齊字串), %-11.2f (左對齊浮點數保留兩位), %10.0f (右對齊整數)
+                    # Note: We use .format() or f-string for Python, which maps to C's printf style.
+                    print(f"{row['Stock_ID']:<8} | {row['Close_Price']:<11.2f} | {row.get('Volume', 0):>10.0f}")
+            else:
+                print("Error: Required columns ('Stock_ID', 'Close_Price', 'Volume') not found in DataFrame.")
                 
         final_output_date = target_check_date
 
