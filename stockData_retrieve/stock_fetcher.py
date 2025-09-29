@@ -90,7 +90,7 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
         df = pd.DataFrame(stock_data, columns=fields)
         # --- 關鍵修正：Data Cleaning and Normalization ---
         # 這裡的步驟確保了 'Stock_ID', 'Close_Price', 'Volume' 這些欄位會被正確建立。
-        
+        '''
         # 找出需要清理逗號和轉型的數值欄位
         numeric_cols_to_clean = ['證券代號', '證券名稱', '成交股數', '成交筆數', 
                                  '成交金額', '開盤價', '最高價', '最低價', '收盤價', 
@@ -116,6 +116,7 @@ def fetch_twse_daily_summary(target_date: str) -> pd.DataFrame:
         df = df[df['Stock_ID'].astype(str).str.match(r'^\d{4}$')]
         
         print(f"Successfully processed and cleaned {len(df)} valid records.")
+        '''
         return df
 
     else:
@@ -205,7 +206,7 @@ def main():
         market_df = fetch_twse_daily_summary(target_check_date.strftime('%Y%m%d')) 
         if not market_df.empty:
             save_to_sqlite(market_df, target_check_date)
-            
+            '''
             # Data Sample for printf practice (包含不同的型別：字串、浮點數、整數)
             print("\nData Sample (for struct & printf practice):")
             # 確保 'Close_Price' 和 'Volume' 存在且是正確的數字型別
@@ -219,7 +220,7 @@ def main():
                     print(f"{row['Stock_ID']:<8} | {row['Close_Price']:<11.2f} | {row.get('Volume', 0):>10.0f}")
             else:
                 print("Error: Required columns ('Stock_ID', 'Close_Price', 'Volume') not found in DataFrame.")
-                
+            '''
         final_output_date = target_check_date
 
   
