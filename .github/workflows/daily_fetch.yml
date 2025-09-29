@@ -35,13 +35,13 @@ jobs:
           python stockData_retrieve/stock_fetcher.py
           echo "--- File Status Check ---"
           # 偵錯：顯示資料夾內容，確認檔案是否生成
-          ls -la stockData_retrieve/
+          ls -la stockData/
 
       - name: 5. Auto Commit Updated DB File
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "feat: 自動新增股價資料 DB 檔案 (GitHub Actions)"
           # 使用萬用字元 (*) 來匹配每天新增的檔案
-          file_pattern: 'stockData_retrieve/stock_data_*.db' 
+          file_pattern: 'stockData/stock_data_*.db' 
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
