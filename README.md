@@ -5,7 +5,7 @@
     來源:TWSE，"https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={date}&type=ALLBUT0999"
     * date={date}: 這是指定要查詢哪一天的交易資料。您需要將 {date} 替換成實際的日期，格式通常是 YYYYMMDD（例如：20251010）。
 
-    * type=ALLBUT0999: 這是指定要查詢哪一類的市場資訊。ALLBUT0999 表示查詢「不包含 0999（全部）」的所有市場資訊，在這個 API 中，它通常被視為一個代表所有主要市場資訊（例如：大盤統計、個股收盤價等）的代碼。
+    * type=ALLBUT0999: 這是指定要查詢哪一類的市場資訊。ALLBUT0999 表示查詢 全部上市股票（不含權證）的所有市場資訊。
 
 - [x] 2. 取得最近一個有效交易日，設定為date之參數。
     * 配合holidays 套件，確認最近一個台灣的交易日
