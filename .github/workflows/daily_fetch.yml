@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "Starting Python script execution..."
           # 執行 Python 腳本
-          python stockData_retrieve/stock_fetcher.py
+          python stockData_retrieve/daily_stock_fetcher.py
           echo "--- File Status Check ---"
           # 偵錯：顯示資料夾內容，確認檔案是否生成
           ls -la stockData/
