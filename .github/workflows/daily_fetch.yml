@@ -32,7 +32,7 @@ jobs:
       - name: 4. Execute Python Script (Fetch Data & Debug)
         run: |
           echo "Starting Python script execution..."
-          python stockData_retrieve/daily_stock_fetcher_2.py
+          python stockData_retrieve/daily_stock_fetcher_v2.py
           echo "--- File Status Check ---"
           # 偵錯：確認兩大資料夾的檔案生成狀況
           ls -la stockData/csv/ || true
