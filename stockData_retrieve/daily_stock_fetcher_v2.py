@@ -135,32 +135,39 @@ def save_data_files(df: pd.DataFrame, target_date: datetime):
 
     date_str = target_date.strftime('%Y%m%d')
     
-    # 定義個別資料夾路徑
     csv_folder = os.path.join("stockData", "csv")
     sql_folder = os.path.join("stockData", "sql")
     
-    # 確保兩大資料夾均存在
     os.makedirs(csv_folder, exist_ok=True)
     os.makedirs(sql_folder, exist_ok=True)
     
-    # 1. 儲存 CSV 檔案 (寫入 stockData/csv/ 資料夾)
-    csv_file_path = os.path.abspath(os.path.join(csv_folder, f"stock_data_{date_str}.csv"))
-    df.to_csv(csv_file_path, index=False, encoding='utf-8-sig')
-    print(f"1. CSV File successfully saved to: '{csv_file_path}'")
+    # 1. 儲存 CSV 檔案
+    try:
+        csv_file_path = os.path.abspath(os.path.join(csv_folder, f"stock_data_{date_str}.csv"))
+        df.to_csv(csv_file_path, index=False, encoding='utf-8-sig')
+        print(f"1. CSV File successfully saved to: '{csv_file_path}'")
+    except Exception as e:
+        print(f"Error saving CSV: {e}")
 
-    # 2. 儲存 SQL/SQLite DB 檔案 (寫入 stockData/sql/ 資料夾)
-    db_file_path = os.path.abspath(os.path.join(sql_folder, f"stock_data_{date_str}.db"))
-    engine = create_engine(f"sqlite:///{db_file_path}")
-    
-    db_df = df.rename(columns={
-        'Date': 'date', 'Ticker': 'ticker', 'Open': 'open', 'High': 'high', 
-        'Low': 'low', 'Close': 'close', 'Volume': 'volume', 
-        'ForeignNetBuy': 'foreign_net_buy', 'TrustNetBuy': 'trust_net_buy', 
-        'DealerNetBuy': 'dealer_net_buy', 'RetailVolume': 'retail_volume'
-    }).drop(columns=['Name'], errors='ignore')
-    
-    db_df.to_sql("stock_kline", engine, if_exists='replace', index=False)
-    print(f"2. DB File successfully saved to: '{db_file_path}'")
+    # 2. 儲存 SQLite DB 檔案 (加入 context manager 確保 Flush/Close)
+    try:
+        db_file_path = os.path.abspath(os.path.join(sql_folder, f"stock_data_{date_str}.db"))
+        engine = create_engine(f"sqlite:///{db_file_path}")
+        
+        db_df = df.rename(columns={
+            'Date': 'date', 'Ticker': 'ticker', 'Open': 'open', 'High': 'high', 
+            'Low': 'low', 'Close': 'close', 'Volume': 'volume', 
+            'ForeignNetBuy': 'foreign_net_buy', 'TrustNetBuy': 'trust_net_buy', 
+            'DealerNetBuy': 'dealer_net_buy', 'RetailVolume': 'retail_volume'
+        }).drop(columns=['Name'], errors='ignore')
+        
+        # 使用 context manager 進行寫入與自動關閉連線
+        with engine.begin() as conn:
+            db_df.to_sql("stock_kline", conn, if_exists='replace', index=False)
+            
+        print(f"2. DB File successfully saved to: '{db_file_path}'")
+    except Exception as e:
+        print(f"Error saving DB: {e}")
     
     
 # --- 主執行邏輯 ---
