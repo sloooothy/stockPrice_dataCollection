@@ -27,7 +27,7 @@ jobs:
           cache: 'pip'
 
       - name: 3. Install Dependencies
-        run: pip install -r stockData_retrieve/requirements.txt
+        run: pip install -r requirements.txt
 
       - name: 4. Execute Python Script (Fetch Data & Debug)
         run: |
