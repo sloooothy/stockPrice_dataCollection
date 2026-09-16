@@ -38,6 +38,12 @@ jobs:
           ls -la stockData/csv/ || true
           ls -la stockData/sql/ || true
 
+      - name: 4.5 Stage Files Manually
+        run: |
+          git add stockData/csv/
+          git add stockData/sql/
+          git status
+
       - name: 5. Auto Commit Updated CSV & SQL Files
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
