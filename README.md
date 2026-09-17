@@ -1,4 +1,4 @@
-# 台灣股市資料擷取與選股系統 (Stock Analysis System)
+# 台灣股市資料擷取 (Stock Collection System)
 
 > 建立自動化爬蟲排程擷取台股每日交易、月度營收與季度財報，並提供動態網頁介面供使用者進行策略選股。
 
