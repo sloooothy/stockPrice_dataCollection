@@ -1,4 +1,4 @@
-name: Daily Stock Data Fetcher (Step 1)
+name: Daily Stock Data Fetcher
 
 # 設定排程：每天 UTC 時間 9 點執行 (大約是台灣時間下午 5 點)。
 on:
