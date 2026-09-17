@@ -9,16 +9,18 @@
 - [x] **1. 股票標的清單與每日數據源研究**
   * 使用 TWSE 每日交易彙總表 API：
     `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={YYYYMMDD}&type=ALLBUT0999`
-  * 擷取全部上市股票（不含權證）之市場交易資訊。
 
-- [ ] **2. 交易時間與日曆模組**
+- [ ] **2. 擷取資料功能**
+  * 擷取全部上市（不含權證=ALLBUT0999）/上櫃股票之市場交易資訊。
+  * 
+- [ ] **3. 交易時間與日曆模組**
   * 結合 Python `holidays` 套件，自動判斷台灣國定假日與非交易日。
   * 提供 `get_latest_trading_day()` 函數回傳最近一個有效交易日。
 
-- [x] **3. GitHub Actions 排程自動化**
+- [x] **4. GitHub Actions 排程自動化**
   * 設定每日收盤後（16:00 UTC+8）自動觸發爬蟲與資料消化流程。
 
-- [x] **4. 原始資料存儲 (Raw Data Pipeline)**
+- [x] **5. 原始資料存儲 (Raw Data Pipeline)**
   * **路徑**：`./stockData/`
   * **CSV Format**：供 MongoDB 批次匯入使用。
   * **DB File**：併入 `.db` 檔案（支援 SQLite / PostgreSQL）。
