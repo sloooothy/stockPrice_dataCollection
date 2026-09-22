@@ -35,7 +35,7 @@ def fetch_twse_all_data(target_date_str: str) -> pd.DataFrame:
         df_price = df_price[['證券代號', '證券名稱', '開盤價', '最高價', '最低價', '收盤價', '成交股數']]
         df_price.columns = ['ticker_raw', 'Name', 'Open', 'High', 'Low', 'Close', 'Volume']
         
-        df_price['Ticker'] = df_price['ticker_raw'].astype(str).str.strip() + ".TW"
+        df_price['Ticker'] = df_price['ticker_raw'].astype(str).str.strip()
         
         num_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
         for col in num_cols:
