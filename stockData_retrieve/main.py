@@ -7,7 +7,7 @@ import dataCollection as collector
 
 TZ_TAIPEI = pytz.timezone('Asia/Taipei')
 
-def main():
+def main(args_list=None):
 	parser = argparse.ArgumentParser(description="TWSE Stock Data Fetcher")
 	
 	# 命令列參數設定
@@ -18,7 +18,7 @@ def main():
 	parser.add_argument('--quarter', '-Q', type=int, choices=[1, 2, 3, 4], help="指定季度 (1-4)")
 	parser.add_argument('--param', '-p', type=str, help="臨時資料用的自訂參數")
 
-	args = parser.parse_args()
+	args = parser.parse_args(args_list) # 如果有傳入 args_list 就解析 args_list，否則解析命令列輸入
 	now_tst = datetime.now(TZ_TAIPEI)
 
 	# 1. 日資料 (Daily)
@@ -65,3 +65,14 @@ def main():
 
 if __name__ == "__main__":
 	main()
+	'''
+	# 範例：連續執行不同任務
+	print("--- 執行日資料 ---")
+	main(['-t', 'daily', '-d', '20260320'])
+	
+	print("\n--- 執行月資料 ---")
+	main(['-t', 'monthly', '-Y', '2026', '-M', '2'])
+	
+	print("\n--- 執行季資料 ---")
+	main(['-t', 'quarterly', '-Y', '2025', '-Q', '4'])
+	'''
