@@ -41,7 +41,8 @@ def main(args_list=None):
 		print(f"Target Monthly Date: {valid_year}/{valid_month:02d}")
 		
 		# TODO: 呼叫 collector.fetch_monthly_data(valid_year, valid_month) 並存檔
-		monthly_df = collector.fetch_monthly_data(valid_year, valid_month)
+		# monthly_df = collector.fetch_monthly_data(valid_year, valid_month)
+		monthly_df = collector.fetch_monthly_revenue(valid_year, valid_month)
 		if not monthly_df.empty:
 			collector.save_data_to_json(monthly_df, "stock_monthly", f"{valid_year}{valid_month:02d}")
 
@@ -51,7 +52,8 @@ def main(args_list=None):
 		print(f"Target Quarterly Date: {valid_year} Q{valid_quarter}")
 		
 		# TODO: 呼叫 collector.fetch_quarterly_data(valid_year, valid_quarter) 並存檔
-		quarterly_df = collector.fetch_quarterly_data(valid_year, valid_quarter)
+		# quarterly_df = collector.fetch_quarterly_data(valid_year, valid_quarter)
+		quarterly_df = collector.fetch_quarterly_financials(valid_year, valid_quarter)
 		if not quarterly_df.empty:
 			collector.save_data_to_json(quarterly_df, "stock_quarterly", f"{valid_year}_Q{valid_quarter}")
 
@@ -65,14 +67,13 @@ def main(args_list=None):
 
 if __name__ == "__main__":
 	main()
-	'''
+	
 	# 範例：連續執行不同任務
-	print("--- 執行日資料 ---")
-	main(['-t', 'daily', '-d', '20260320'])
+	#print("--- 執行日資料 ---")
+	#main(['-t', 'daily', '-d', '20260320'])
 	
-	print("\n--- 執行月資料 ---")
-	main(['-t', 'monthly', '-Y', '2026', '-M', '2'])
+	#print("\n--- 執行月資料 ---")
+	#main(['-t', 'monthly', '-Y', '2026', '-M', '2'])
 	
-	print("\n--- 執行季資料 ---")
-	main(['-t', 'quarterly', '-Y', '2025', '-Q', '4'])
-	'''
+	#print("\n--- 執行季資料 ---")
+	#main(['-t', 'quarterly', '-Y', '2025', '-Q', '4'])

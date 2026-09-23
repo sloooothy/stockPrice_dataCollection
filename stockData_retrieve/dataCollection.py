@@ -3,6 +3,7 @@ import time
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
+import io
 
 # --- 1. TWSE 日資料抓取與清洗 ---
 def fetch_twse_all_data(target_date_str: str) -> pd.DataFrame:
@@ -215,7 +216,8 @@ def fetch_monthly_revenue(year: int, month: int) -> pd.DataFrame:
         (需另寫爬蟲對接 TDCC 臺灣集中保管結算所 API / 網頁)
     """
     roc_year = year - 1911
-    url = f"https://mops.twse.com.tw/nas/t21/sih/t21sc03_{roc_year}_{month}_0.html"
+    url = f"https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_{roc_year}_{month}_0.html"
+    #print(f"fetch data from {url}")
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
@@ -224,21 +226,45 @@ def fetch_monthly_revenue(year: int, month: int) -> pd.DataFrame:
     try:
         res = requests.get(url, headers=headers)
         res.encoding = 'big5'
-        
-        dfs = pd.read_html(res.text)
+        # ✅ 使用 io.StringIO 將字串轉為類檔案物件 (File-like object)
+        dfs = pd.read_html(io.StringIO(res.text))
         revenue_list = []
-        
+        #print(f"共抓到 {len(dfs)} 個表格")
         for df in dfs:
-            if df.shape[1] >= 11 and ('公司代號' in str(df.iloc[0]) or '公司名稱' in str(df.iloc[0])):
+            # 1. 檢查表格欄位數
+            if df.shape[1] < 11:
+                continue
+
+            # 2. 先處理多層欄位：若為 MultiIndex，取最後一層並去除所有空白
+            if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(-1)
-                valid_rows = df[df['公司代號'].astype(str).str.match(r'^\d{4}$')]
-                if not valid_rows.empty:
-                    revenue_list.append(valid_rows)
+
+            # 將欄位名稱統一轉成字串並去除空白（防止網頁上的「公司 代號」有空格）
+            df.columns = df.columns.astype(str).str.replace(r"\s+", "", regex=True)
+
+            # 3. 修正過濾條件：直接對『欄位標題』進行檢查
+            if "公司代號" in df.columns or "公司名稱" in df.columns:
+
+                # 4. 確保欄位中有「公司代號」且進行 4 位數股票代碼篩選
+                if "公司代號" in df.columns:
+                    # 去除公司代號欄位中的空白
+                    df["公司代號"] = (
+                        df["公司代號"].astype(str).str.strip()
+                    )
+
+                    # 篩選出 4 位數的股票代號（排除掉小計、合計等文字列）
+                    valid_rows = df[
+                        df["公司代號"].str.match(r"^\d{4}$", na=False)
+                    ]
+
+                    if not valid_rows.empty:
+                        revenue_list.append(valid_rows)
                     
         if not revenue_list:
             return pd.DataFrame()
             
         full_df = pd.concat(revenue_list, ignore_index=True)
+        #print(full_df.head())
         
         result = pd.DataFrame()
         result['sid'] = full_df['公司代號'].astype(str).str.strip()
@@ -246,13 +272,16 @@ def fetch_monthly_revenue(year: int, month: int) -> pd.DataFrame:
         result['month'] = month
         
         def clean_num(val):
-            return pd.to_numeric(str(val).replace(',', '').strip(), errors='coerce')
+            # 確保傳入的是 Series，並將內部字串的逗號與空白清除後轉為數字
+            return pd.to_numeric(
+                val.astype(str).str.replace(",", "").str.strip(), errors="coerce"
+            )
             
         result['revenue'] = (clean_num(full_df['當月營收']) * 1000).fillna(0).astype('int64')
-        result['revenueMoM'] = clean_num(full_df['上月比較 增減(%)']).fillna(0)
-        result['revenueYoY'] = clean_num(full_df['去年同月 增減(%)']).fillna(0)
+        result['revenueMoM'] = clean_num(full_df['上月比較增減(%)']).fillna(0)
+        result['revenueYoY'] = clean_num(full_df['去年同月增減(%)']).fillna(0)
         result['accRevenue'] = (clean_num(full_df['當月累計營收']) * 1000).fillna(0).astype('int64')
-        result['accRevenueYoY'] = clean_num(full_df['前期比較 增減(%)']).fillna(0)
+        result['accRevenueYoY'] = clean_num(full_df['前期比較增減(%)']).fillna(0)
         
         return result
         
