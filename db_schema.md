@@ -22,7 +22,7 @@
 * `sid` *(VARCHAR)* **[PK]** - 股票代號
 * `s_name` *(VARCHAR)* - 股票名稱
 * `s_mainDuty` *(TEXT)* - 主要業務說明
-* `s_status` *(VARCHAR)* - 營業狀況（正常上市、變更交易、停牌等）
+* `s_status` *(VARCHAR)* - 營業狀況（1 = 正常上市櫃，0 = 未上市或已下市）
 
 ---
 ### 2. `dailyData` - 每日交易與籌碼表

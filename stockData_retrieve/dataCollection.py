@@ -4,111 +4,209 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import io
+from io import StringIO
+from mops_crawler import MopsCrawler
 
+from bs4 import BeautifulSoup
+
+from tqdm import tqdm
+
+
+#============================
+# --- 0. TWSE 公司基本資料 ---
+# 資料來源: https://openapi.twse.com.tw/#/
+#============================
+def fetch_stock_info_with_duty() -> pd.DataFrame:
+    """
+    抓取上市櫃公司清單，並整合 Selenium 抓取主要業務，附帶 tqdm 進度條
+    產出符合 stock_info 資料表結構：sid, s_name, s_mainDuty, s_status
+    """
+    all_data = []
+    
+    # 1. 抓取上市公司基本資料
+    url_listed = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
+    try:
+        res = requests.get(url_listed, timeout=10)
+        listed_data = res.json()
+        for item in listed_data:
+            sid = item.get('公司代號')
+            # 先初步過濾，確保是 4 位數股票代號
+            if sid and str(sid).isdigit() and len(str(sid)) == 4:
+                all_data.append({
+                    'sid': str(sid),
+                    's_name': item.get('公司名稱'),
+                    's_status': 1  # 正常上市
+                })
+    except Exception as e:
+        print(f"抓取上市公司清單失敗: {e}")
+
+    # 2. 抓取上櫃公司基本資料
+    url_otc = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
+    try:
+        res = requests.get(url_otc, timeout=10)
+        otc_data = res.json()
+        for item in otc_data:
+            sid = item.get('SecuritiesCompanyCode') or item.get('公司代號')
+            if sid and str(sid).isdigit() and len(str(sid)) == 4:
+                all_data.append({
+                    'sid': str(sid),
+                    's_name': item.get('CompanyName') or item.get('公司名稱'),
+                    's_status': 1  # 正常上櫃
+                })
+    except Exception as e:
+        print(f"抓取上櫃公司清單失敗: {e}")
+
+    df_base = pd.DataFrame(all_data)
+    if df_base.empty:
+        print("沒有取得任何公司基本資料！")
+        df_base = pd.DataFrame(columns=['sid', 's_name', 's_mainDuty', 's_status'])
+        return df_base
+
+    # 3. 💡 帶有 tqdm 進度條的迴圈：逐筆透過 WebDriver 爬取主要業務
+    print(f"開始透過 Selenium 抓取共計 {len(df_base)} 家公司的主要經營業務...")
+    main_duties = []
+    
+    # 使用 tqdm 包覆迭代過程，顯示即時進度條
+    for idx, row in tqdm(df_base.iterrows(), total=len(df_base), desc="爬取 MOPS 業務"):
+        sid = row['sid']
+        
+        # 呼叫你寫好的 crawler 抓取業務
+        duty = get_company_duty_from_mops(sid)
+        main_duties.append(duty)
+        
+        # 隨機緩衝，避免請求太快被封鎖
+        time.sleep(1.0)
+
+    # 將抓到的業務塞回 DataFrame
+    df_base['s_mainDuty'] = main_duties
+
+    # 4. 整理成最終需要的欄位結構
+    stock_info = pd.DataFrame({
+        'sid': df_base['sid'],
+        's_name': df_base['s_name'],
+        's_mainDuty': df_base['s_mainDuty'],
+        's_status': df_base['s_status']
+    })
+    
+    return stock_info
+
+def get_company_duty_from_mops(sid):
+    
+    # 使用 with 語法，執行完畢會自動關閉瀏覽器
+    with  MopsCrawler(headless=True) as crawler:
+        single_result = crawler.fetch_business(sid)
+        #print(single_result)
+        return single_result
+
+def get_gcis_business(coTax_id):
+    # 資料來源: data.gcis.nat.gov.tw/od/data/api
+    # TODO: 利用公司統編查詢商業相關資料
+    print(f"利用公司統編查詢商業相關資料")
+    return ""
+    
 # --- 1. TWSE 日資料抓取與清洗 ---
 def fetch_twse_all_data(target_date_str: str) -> pd.DataFrame:
-	"""
-	抓取 TWSE 個股行情與三大法人買賣超，並進行欄位合併與轉換
-	target_date_str 格式: YYYYMMDD
-	"""
-	headers = {
-		'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-		'Referer': 'https://www.twse.com.tw/' 
-	}
-	
-	url_price = f"https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={target_date_str}&type=ALLBUT0999"
-	url_chip = f"https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date={target_date_str}&selectType=ALLBUT0999"
-	
-	print(f"Requesting TWSE market data for {target_date_str}...")
-	
-	try:
-		# 取得行情資料
-		res_price = requests.get(url_price, headers=headers)
-		data_price = res_price.json()
-		
-		if 'tables' not in data_price or not data_price['tables']:
-			print(f"No price data found for {target_date_str}.")
-			return pd.DataFrame()
-			
-		raw_price = data_price['tables'][8]
-		df_price = pd.DataFrame(raw_price['data'], columns=raw_price['fields'])
-		
-		df_price = df_price[['證券代號', '證券名稱', '開盤價', '最高價', '最低價', '收盤價', '成交股數']]
-		df_price.columns = ['ticker_raw', 'Name', 'Open', 'High', 'Low', 'Close', 'Volume']
-		
-		df_price['Ticker'] = df_price['ticker_raw'].astype(str).str.strip()+".TW"
-		
-		num_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-		for col in num_cols:
-			df_price[col] = df_price[col].astype(str).str.replace(',', '').str.replace('--', '0').str.strip()
-			df_price[col] = pd.to_numeric(df_price[col], errors='coerce').fillna(0)
-			
-		time.sleep(3) # 避開 Rate Limit
-		
-		# 取得三大法人籌碼資料
-		res_chip = requests.get(url_chip, headers=headers)
-		data_chip = res_chip.json()
-		
-		df_chip = pd.DataFrame()
-		if 'data' in data_chip:
-			df_chip = pd.DataFrame(data_chip['data'], columns=data_chip['fields'])
-			df_chip['Ticker'] = df_chip['證券代號'].astype(str).str.strip() + ".TW"
-			
-			for col in ['外陸資買賣超股數(不含外資自營商)', '投信買賣超股數', '自營商買賣超股數']:
-				if col in df_chip.columns:
-					df_chip[col] = df_chip[col].astype(str).str.replace(',', '').str.strip()
-					df_chip[col] = pd.to_numeric(df_chip[col], errors='coerce').fillna(0)
-				else:
-					df_chip[col] = 0
-			
-			df_chip = df_chip[['Ticker', '外陸資買賣超股數(不含外資自營商)', '投信買賣超股數', '自營商買賣超股數']]
-			df_chip.columns = ['Ticker', 'ForeignNetBuy', 'TrustNetBuy', 'DealerNetBuy']
+    """
+    抓取 TWSE 個股行情與三大法人買賣超，並進行欄位合併與轉換
+    target_date_str 格式: YYYYMMDD
+    """
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.twse.com.tw/' 
+    }
+    
+    url_price = f"https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={target_date_str}&type=ALLBUT0999"
+    url_chip = f"https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date={target_date_str}&selectType=ALLBUT0999"
+    
+    print(f"Requesting TWSE market data for {target_date_str}...")
+    
+    try:
+        # 取得行情資料
+        res_price = requests.get(url_price, headers=headers)
+        data_price = res_price.json()
+        
+        if 'tables' not in data_price or not data_price['tables']:
+            print(f"No price data found for {target_date_str}.")
+            return pd.DataFrame()
+            
+        raw_price = data_price['tables'][8]
+        df_price = pd.DataFrame(raw_price['data'], columns=raw_price['fields'])
+        
+        df_price = df_price[['證券代號', '證券名稱', '開盤價', '最高價', '最低價', '收盤價', '成交股數']]
+        df_price.columns = ['ticker_raw', 'Name', 'Open', 'High', 'Low', 'Close', 'Volume']
+        
+        df_price['Ticker'] = df_price['ticker_raw'].astype(str).str.strip()+".TW"
+        
+        num_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+        for col in num_cols:
+            df_price[col] = df_price[col].astype(str).str.replace(',', '').str.replace('--', '0').str.strip()
+            df_price[col] = pd.to_numeric(df_price[col], errors='coerce').fillna(0)
+            
+        time.sleep(3) # 避開 Rate Limit
+        
+        # 取得三大法人籌碼資料
+        res_chip = requests.get(url_chip, headers=headers)
+        data_chip = res_chip.json()
+        
+        df_chip = pd.DataFrame()
+        if 'data' in data_chip:
+            df_chip = pd.DataFrame(data_chip['data'], columns=data_chip['fields'])
+            df_chip['Ticker'] = df_chip['證券代號'].astype(str).str.strip() + ".TW"
+            
+            for col in ['外陸資買賣超股數(不含外資自營商)', '投信買賣超股數', '自營商買賣超股數']:
+                if col in df_chip.columns:
+                    df_chip[col] = df_chip[col].astype(str).str.replace(',', '').str.strip()
+                    df_chip[col] = pd.to_numeric(df_chip[col], errors='coerce').fillna(0)
+                else:
+                    df_chip[col] = 0
+            
+            df_chip = df_chip[['Ticker', '外陸資買賣超股數(不含外資自營商)', '投信買賣超股數', '自營商買賣超股數']]
+            df_chip.columns = ['Ticker', 'ForeignNetBuy', 'TrustNetBuy', 'DealerNetBuy']
 
-		if not df_chip.empty:
-			merged_df = pd.merge(df_price, df_chip, on='Ticker', how='left').fillna(0)
-		else:
-			merged_df = df_price
-			merged_df['ForeignNetBuy'] = 0
-			merged_df['TrustNetBuy'] = 0
-			merged_df['DealerNetBuy'] = 0
+        if not df_chip.empty:
+            merged_df = pd.merge(df_price, df_chip, on='Ticker', how='left').fillna(0)
+        else:
+            merged_df = df_price
+            merged_df['ForeignNetBuy'] = 0
+            merged_df['TrustNetBuy'] = 0
+            merged_df['DealerNetBuy'] = 0
 
-		# 計算 RetailVolume
-		institutional_vol = merged_df['ForeignNetBuy'].abs() + merged_df['TrustNetBuy'].abs() + merged_df['DealerNetBuy'].abs()
-		merged_df['RetailVolume'] = (merged_df['Volume'] - institutional_vol).clip(lower=0).astype(int)
+        # 計算 RetailVolume
+        institutional_vol = merged_df['ForeignNetBuy'].abs() + merged_df['TrustNetBuy'].abs() + merged_df['DealerNetBuy'].abs()
+        merged_df['RetailVolume'] = (merged_df['Volume'] - institutional_vol).clip(lower=0).astype(int)
 
-		date_formatted = datetime.strptime(target_date_str, '%Y%m%d').strftime('%Y-%m-%d')
-		merged_df['Date'] = date_formatted
+        date_formatted = datetime.strptime(target_date_str, '%Y%m%d').strftime('%Y-%m-%d')
+        merged_df['Date'] = date_formatted
 
-		final_cols = ['Date', 'Ticker', 'Name', 'Open', 'High', 'Low', 'Close', 'Volume', 
-					  'ForeignNetBuy', 'TrustNetBuy', 'DealerNetBuy', 'RetailVolume']
-		
-		merged_df = merged_df[final_cols]
-		merged_df = merged_df[merged_df['Ticker'].str.match(r'^\d{4}\.TW$')]
-		
-		return merged_df
+        final_cols = ['Date', 'Ticker', 'Name', 'Open', 'High', 'Low', 'Close', 'Volume', 
+                      'ForeignNetBuy', 'TrustNetBuy', 'DealerNetBuy', 'RetailVolume']
+        
+        merged_df = merged_df[final_cols]
+        merged_df = merged_df[merged_df['Ticker'].str.match(r'^\d{4}\.TW$')]
+        
+        return merged_df
 
-	except Exception as e:
-		print(f"Error processing TWSE data: {e}")
-		return pd.DataFrame()
+    except Exception as e:
+        print(f"Error processing TWSE data: {e}")
+        return pd.DataFrame()
 
 # --- 2. 儲存為單一 JSON 檔案 ---
 def save_data_to_json(df: pd.DataFrame, file_prefix: str, date_suffix: str):
-	"""將 DataFrame 轉存為 JSON 檔案，存放在 stockData/json/ 下"""
-	if df.empty:
-		print("DataFrame is empty. Skipping save operation.")
-		return
+    """將 DataFrame 轉存為 JSON 檔案，存放在 stockData/json/ 下"""
+    if df.empty:
+        print("DataFrame is empty. Skipping save operation.")
+        return
 
-	json_folder = os.path.join("stockData", "json")
-	os.makedirs(json_folder, exist_ok=True)
-	
-	try:
-		json_file_path = os.path.abspath(os.path.join(json_folder, f"{file_prefix}_{date_suffix}.json"))
-		# orient='records' 將每列轉為 JSON 物件格式，force_ascii=False 確保中文檔名與內容正常呈現
-		df.to_json(json_file_path, orient='records', force_ascii=False, indent=4)
-		print(f"JSON File successfully saved to: '{json_file_path}'")
-	except Exception as e:
-		print(f"Error saving JSON: {e}")
-
+    json_folder = os.path.join("stockData", "json")
+    os.makedirs(json_folder, exist_ok=True)
+    
+    try:
+        json_file_path = os.path.abspath(os.path.join(json_folder, f"{file_prefix}_{date_suffix}.json"))
+        # orient='records' 將每列轉為 JSON 物件格式，force_ascii=False 確保中文檔名與內容正常呈現
+        df.to_json(json_file_path, orient='records', force_ascii=False, indent=4)
+        print(f"JSON File successfully saved to: '{json_file_path}'")
+    except Exception as e:
+        print(f"Error saving JSON: {e}")
 
 
 # -----------------------------------------------------------------------------
@@ -371,6 +469,6 @@ def fetch_quarterly_financials(year: int, quarter: int) -> pd.DataFrame:
 
 # --- TODO 區塊：擴充其他資料類型 ---
 def fetch_temp_data(param: str = None) -> pd.DataFrame:
-	# TODO: 臨時資料/特定事件抓取邏輯
-	print(f"[TODO] Fetching temporary data with param: {param}...")
-	return pd.DataFrame()
+    # TODO: 臨時資料/特定事件抓取邏輯
+    print(f"[TODO] Fetching temporary data with param: {param}...")
+    return pd.DataFrame()
