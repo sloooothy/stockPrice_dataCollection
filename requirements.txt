@@ -1,7 +1,1 @@
-# requirements.txt
-pandas>=2.0.0
-requests>=2.28.0
-pytz>=2023.3
-holidays>=0.30
-html5lib
-lxml
+requestspandasbeautifulsoup4tqdmpytzseleniumwebdriver-managerholidays
