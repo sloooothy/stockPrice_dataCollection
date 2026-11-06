@@ -14,17 +14,17 @@
 * `TrustNetBuy` *(BIGINT / INT)* - 投信買賣超股數
 * `DealerNetBuy` *(BIGINT / INT)* - 自營商買賣超股數
 * `RetailVolume` *(BIGINT / INT)* - 估算散戶成交量（總成交股數扣除三大法人買賣超絕對值總和，下限為 0）
+---
 
-
-### 0. 資料庫名稱: `stock_analysis_db`
+## 0. 資料庫名稱: `stock_analysis_db`
 
 ### 1. `stock_info` - 股票基本資訊表
 * `sid` *(VARCHAR)* **[PK]** - 股票代號
 * `s_name` *(VARCHAR)* - 股票名稱
 * `s_mainDuty` *(TEXT)* - 主要業務說明
 * `s_status` *(VARCHAR)* - 營業狀況（1 = 正常上市櫃，0 = 未上市或已下市）
-
 ---
+
 ### 2. `dailyData` - 每日交易與籌碼表
 
 #### 2.1 原始預定資料規格
