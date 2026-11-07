@@ -266,9 +266,6 @@ def convert_negative_number(num_str):
         return "-" + num_str[1:-1]
     return num_str
 
-
-
-
 ##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
