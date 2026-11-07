@@ -1,9 +1,9 @@
-name: Daily Data Sync
+name: Notice News fetching Sync
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 0:00 執行一次（維持活躍並更新資料）
-  workflow_dispatch:     # 允許手動觸發測試
+    - cron: '0 9 * * 1-5' # 台灣時間每週一至週五下午 5:00 執行
+  workflow_dispatch:      # 允許手動觸發測試
 
 jobs:
   run:
@@ -23,4 +23,4 @@ jobs:
       - name: 執行程式
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: python stockData_retrieve/fetch_notice.py
+        run: python stockData_retrieve/fetch_notice.py -yy 115 -mm 11 -dd 5 #testing
