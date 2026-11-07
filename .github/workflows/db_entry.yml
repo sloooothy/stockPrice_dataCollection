@@ -18,9 +18,9 @@ jobs:
           python-version: '3.12'
 
       - name: 安裝套件
-        run: pip install pymongo requests
+        run: pip install -r requirements.txt
 
       - name: 執行程式
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: python stockData_retrieve/test.py
+        run: python stockData_retrieve/fetch_notice.py
