@@ -23,4 +23,4 @@ jobs:
       - name: 執行程式
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: python stockData_retrieve/fetch_notice.py -yy 115 -mm 11 -dd 5 #testing
+        run: python stockData_retrieve/fetch_notice.py
