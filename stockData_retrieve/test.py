@@ -9,9 +9,15 @@ def write2DB_one(db_name, colleciotn_name,wr_data):
     db = client[db_name]
     collection = db[colleciotn_name]
 
-    collection.insert_one(wr_data)
+    result=collection.insert_one(wr_data)
+    # debug 透過 inserted_id 嚴格確認是否寫入成功
+    if result.inserted_id:
+        print(f"資料寫入成功！ MongoDB 產生的 ID: {result.inserted_id}")
+    else:
+        print("寫入可能失敗，未取得 inserted_id。")
+
+    # 5. 關閉連線
     client.close()
-    print("資料寫入成功！")
     
     
 test_data={"status": "success", "message": "daily sync"}
