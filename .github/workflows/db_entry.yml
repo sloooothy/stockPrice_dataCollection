@@ -8,6 +8,13 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    
+    # 共用的環境變數
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      NOTICE_COLLECTION: ${{ secrets.NOTICE_COLLECTION }}
+      
     steps:
       - name: checkout 
         uses: actions/checkout@v4
@@ -20,12 +27,12 @@ jobs:
       - name: 安裝套件
         run: pip install -r requirements.txt
 
-      - name: 執行資烙抓取程式
+      - name: 執行data抓取程式
         env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: python stockData_retrieve/fetch_notice.py
 
-      - name: 執行dicord 發送程式
+      - name: 執行 dicord 發送程式
         env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python stockData_retrieve/inform_discord.py
