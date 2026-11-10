@@ -28,11 +28,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 執行data抓取程式
-        env:
+        # 這裡不需要寫 env，會自動沿用 Job 層級的共用變數
         run: python stockData_retrieve/fetch_notice.py
 
       - name: 執行 dicord 發送程式
         env:
+          # 這裡保留這支程式獨有的 secret（會與 Job 層級的共用變數合併）
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python stockData_retrieve/inform_discord.py
