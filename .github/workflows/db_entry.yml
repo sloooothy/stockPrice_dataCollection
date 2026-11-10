@@ -20,7 +20,12 @@ jobs:
       - name: 安裝套件
         run: pip install pandas selenium pymongo beautifulsoup4 python-dotenv
 
-      - name: 執行程式
+      - name: 執行資烙抓取程式
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: python stockData_retrieve/fetch_notice.py
+
+      - name: 執行dicord 發送程式
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: python stockData_retrieve/inform_discord.py
