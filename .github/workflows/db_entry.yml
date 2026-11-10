@@ -18,7 +18,7 @@ jobs:
           python-version: '3.12'
 
       - name: 安裝套件
-        run: pip install -r requirements.txt
+        run: pip install pandas selenium pymongo beautifulsoup4 python-dotenv
 
       - name: 執行程式
         env:

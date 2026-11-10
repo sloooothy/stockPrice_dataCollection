@@ -19,7 +19,11 @@ import re
 import os
 
 from MongoDB_op import upsertDB_byQuery
+from dotenv import load_dotenv
 
+load_dotenv()
+DB_NAME = os.environ.get("DB_NAME")
+NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 
 def _init_driver():
     options = Options()
@@ -178,7 +182,7 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
                             "notice_date": single_data["notice_date"]
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
-                        upsertDB_byQuery("twse_DB", "stockNotice", {"$set": single_data}, filter_query)
+                        upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
                         print(f"💾 [即時寫入] 公司 {single_data['sid']} ({single_data['sname']}) 資料已同步！")
                     
                     driver.close()

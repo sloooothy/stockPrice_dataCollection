@@ -14,8 +14,8 @@ def _initDB():
 
 # 連線並寫入資料（ MongoDB 超過 60 天閒置會被刪除）
 def write2DB_one(db_name, colleciotn_name,wr_data):
+    db_client=_initDB()
     try:
-        db_client=_initDB()
         db = db_client[db_name]
         collection = db[colleciotn_name]  
         
@@ -31,8 +31,8 @@ def write2DB_one(db_name, colleciotn_name,wr_data):
         return True
     
 def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
+    db_client=_initDB()
     try:
-        db_client=_initDB()
         db = db_client[db_name]
         collection = db[colleciotn_name]  
         
@@ -58,6 +58,31 @@ def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
         # 關閉連線
         db_client.close()
         return True
+        
+        
+def readDB_byQuery(db_name, colleciotn_name, query_filter={}):
+    results_list=[]
+    db_client=_initDB()
+    try:
+        db = db_client[db_name]
+        collection = db[colleciotn_name]  
+        # 檢查符合條件的檔案數量
+        count = collection.count_documents(query_filter)
+
+        if count > 0:
+            print(f"✅ 找到 {count} 筆資料！")
+            # 這時再去執行 find() 把資料抓下來
+            cursor = collection.find(query_filter)
+            results_list = list(cursor)
+        else:
+            print("⚠️ 找不到任何資料。")
+
+    finally:
+        # 關閉連線
+        db_client.close()
+    
+    return results_list
+        
     
 '''
 # DB write in test
