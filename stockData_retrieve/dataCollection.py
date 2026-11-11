@@ -10,7 +10,8 @@ from mops_crawler import MopsCrawler
 from bs4 import BeautifulSoup
 
 from tqdm import tqdm
-
+from MongoDB_op import upsertDB_byQuery
+from dotenv import load_dotenv
 
 #============================
 # --- 0. TWSE 公司基本資料 ---
@@ -32,11 +33,22 @@ def fetch_stock_info_with_duty() -> pd.DataFrame:
             sid = item.get('公司代號')
             # 先初步過濾，確保是 4 位數股票代號
             if sid and str(sid).isdigit() and len(str(sid)) == 4:
-                all_data.append({
+                data_line={
                     'sid': str(sid),
                     's_name': item.get('公司名稱'),
                     's_status': 1  # 正常上市
-                })
+                }
+                
+                query_line={
+                    'sid': str(sid)
+                }
+                #write back to database
+                load_dotenv()
+                DB_NAME = os.environ.get("DB_NAME")
+                BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
+                upsertDB_byQuery(DB_NAME, BASEINFO_COLLECTION, {"$set": data_line}, query_line)
+                
+
     except Exception as e:
         print(f"抓取上市公司清單失敗: {e}")
 

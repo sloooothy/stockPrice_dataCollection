@@ -132,7 +132,7 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
         
         target_indices = []
         includ_keywords = ['公司有價證券']
-        exclud_Keywords = ['公司債']
+        exclud_Keywords = ['公司債','終止上市'] #新增主旨排除條件
 
         for idx, row in enumerate(rows):
             subject_td = row.find('td', {'data-title': '主旨:'})
@@ -176,10 +176,11 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
                     
                     if single_data and single_data.get("sid"):
                         # 🎯 關鍵：即時進行 Upsert 寫入資料庫
-                        # 假設用 「股票代號 + 公告月份」 作為唯一辨識條件
+                        # 用 股票代號 + 公告月份 + 公告時間 作為識條件
                         filter_query = {
                             "sid": single_data["sid"], 
-                            "notice_date": single_data["notice_date"]
+                            "notice_date": single_data["notice_date"],
+                            "announceDate": single_data["announceDate"]
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
                         upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)

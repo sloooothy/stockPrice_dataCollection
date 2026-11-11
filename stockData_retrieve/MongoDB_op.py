@@ -12,7 +12,7 @@ def _initDB():
     except ServerSelectionTimeoutError:
          print("🛑 錯誤：ServerSelectionTimeoutError ")
 
-# 連線並寫入資料（ MongoDB 超過 60 天閒置會被刪除）
+# 寫入單筆資料 (line by line)
 def write2DB_one(db_name, colleciotn_name,wr_data):
     db_client=_initDB()
     try:
@@ -29,7 +29,9 @@ def write2DB_one(db_name, colleciotn_name,wr_data):
         # 關閉連線
         db_client.close()
         return True
-    
+        
+
+# by query upsert    
 def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
     db_client=_initDB()
     try:
@@ -59,7 +61,7 @@ def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
         db_client.close()
         return True
         
-        
+# DB 讀出
 def readDB_byQuery(db_name, colleciotn_name, query_filter={}):
     results_list=[]
     db_client=_initDB()
@@ -71,7 +73,7 @@ def readDB_byQuery(db_name, colleciotn_name, query_filter={}):
 
         if count > 0:
             print(f"✅ 找到 {count} 筆資料！")
-            # 這時再去執行 find() 把資料抓下來
+            # 再去執行 find() 把資料抓下來
             cursor = collection.find(query_filter)
             results_list = list(cursor)
         else:

@@ -5,7 +5,6 @@ from datetime import datetime
 import stockTimer as timer
 import dataCollection as collector
 
-
 TZ_TAIPEI = pytz.timezone('Asia/Taipei')
 
 def main(args_list=None):
