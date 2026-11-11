@@ -10,21 +10,18 @@ from mops_crawler import MopsCrawler
 from bs4 import BeautifulSoup
 
 from tqdm import tqdm
-from MongoDB_op import upsertDB_byQuery
+from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
 
 #============================
 # --- 0. TWSE 公司基本資料 ---
 # 資料來源: https://openapi.twse.com.tw/#/
 #============================
-def fetch_stock_info_with_duty() -> pd.DataFrame:
+def fetch_stock_info():
     """
-    抓取上市櫃公司清單，並整合 Selenium 抓取主要業務，附帶 tqdm 進度條
-    產出符合 stock_info 資料表結構：sid, s_name, s_mainDuty, s_status
+    抓取上市櫃公司清單 寫入database
     """
-    all_data = []
-    
-    # 1. 抓取上市公司基本資料
+    # 抓取上市公司基本資料
     url_listed = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
     try:
         res = requests.get(url_listed, timeout=10)
@@ -38,7 +35,7 @@ def fetch_stock_info_with_duty() -> pd.DataFrame:
                     's_name': item.get('公司名稱'),
                     's_status': 1  # 正常上市
                 }
-                
+                #exist sid
                 query_line={
                     'sid': str(sid)
                 }
@@ -52,7 +49,7 @@ def fetch_stock_info_with_duty() -> pd.DataFrame:
     except Exception as e:
         print(f"抓取上市公司清單失敗: {e}")
 
-    # 2. 抓取上櫃公司基本資料
+    # 抓取上櫃公司基本資料
     url_otc = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
     try:
         res = requests.get(url_otc, timeout=10)
@@ -60,39 +57,54 @@ def fetch_stock_info_with_duty() -> pd.DataFrame:
         for item in otc_data:
             sid = item.get('SecuritiesCompanyCode') or item.get('公司代號')
             if sid and str(sid).isdigit() and len(str(sid)) == 4:
-                all_data.append({
+                data_line={
                     'sid': str(sid),
                     's_name': item.get('CompanyName') or item.get('公司名稱'),
                     's_status': 1  # 正常上櫃
-                })
+                }
+                
+                #exist sid
+                query_line={
+                    'sid': str(sid)
+                }
+                
+                #write back to database
+                load_dotenv()
+                DB_NAME = os.environ.get("DB_NAME")
+                BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
+                upsertDB_byQuery(DB_NAME, BASEINFO_COLLECTION, {"$set": data_line}, query_line)
+                
     except Exception as e:
         print(f"抓取上櫃公司清單失敗: {e}")
 
-    df_base = pd.DataFrame(all_data)
-    if df_base.empty:
-        print("沒有取得任何公司基本資料！")
-        df_base = pd.DataFrame(columns=['sid', 's_name', 's_mainDuty', 's_status'])
-        return df_base
-
-    # 3. 💡 帶有 tqdm 進度條的迴圈：逐筆透過 WebDriver 爬取主要業務
-    print(f"開始透過 Selenium 抓取共計 {len(df_base)} 家公司的主要經營業務...")
-    main_duties = []
+def fetch_stock_duty():
+    """
+    從資料庫讀取上市櫃公司清單 確認主要經營業務後 回database 更新 's_mainDuty'
+    最終: # df_base = pd.DataFrame(columns=['sid', 's_name', 's_mainDuty', 's_status'])
+    """
+    # 逐筆透過 WebDriver 爬取主要業務
+    query={"s_status": 1 }
+    load_dotenv()
+    DB_NAME = os.environ.get("DB_NAME")
+    BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
+    
+    res_list=readDB_byQuery(DB_NAME,NOTICE_COLLECTION)
     
     # 使用 tqdm 包覆迭代過程，顯示即時進度條
-    for idx, row in tqdm(df_base.iterrows(), total=len(df_base), desc="爬取 MOPS 業務"):
+    for row in res_list:
         sid = row['sid']
         
         # 呼叫你寫好的 crawler 抓取業務
         duty = get_company_duty_from_mops(sid)
-        main_duties.append(duty)
+        duty_line={'s_mainDuty':duty}
+        filter_query={'sid':sid}
+        upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": duty_line}, filter_query)
         
         # 隨機緩衝，避免請求太快被封鎖
         time.sleep(1.0)
 
-    # 將抓到的業務塞回 DataFrame
-    df_base['s_mainDuty'] = main_duties
-
-    # 4. 整理成最終需要的欄位結構
+    # 整理成最終需要的欄位結構
+    '''
     stock_info = pd.DataFrame({
         'sid': df_base['sid'],
         's_name': df_base['s_name'],
@@ -101,6 +113,7 @@ def fetch_stock_info_with_duty() -> pd.DataFrame:
     })
     
     return stock_info
+    '''
 
 def get_company_duty_from_mops(sid):
     

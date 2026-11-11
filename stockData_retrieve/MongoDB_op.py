@@ -41,6 +41,7 @@ def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
         result=collection.update_one(filter_query, wr_data, upsert=True)
         # debug 透過 inserted_id 嚴格確認是否寫入成功
         # 判斷寫入結果
+        '''
         if result.upserted_id:
             # 狀況 A：資料庫原本沒有，這是全新插入的
             print(f"✨ [新增成功] 建立了新文件，MongoDB ID: {result.upserted_id}")
@@ -56,6 +57,7 @@ def upsertDB_byQuery(db_name, colleciotn_name, wr_data, filter_query):
         else:
             # 狀況 D：理論上用了 upsert=True 不太會走到這裡，但以防萬一
             print("⚠️ 寫入狀態未知，請檢查條件。")
+        '''
     finally:
         # 關閉連線
         db_client.close()

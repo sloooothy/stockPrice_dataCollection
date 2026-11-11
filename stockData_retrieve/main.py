@@ -67,8 +67,7 @@ def main(args_list=None):
 
 if __name__ == "__main__":
     #main()
-    df_result = collector.fetch_stock_info_with_duty()
-    print(df_result.head(10))
+    collector.fetch_stock_info() #write in
 
     # 範例：連續執行不同任務
     #print("--- 執行日資料 ---")
