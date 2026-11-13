@@ -31,7 +31,7 @@
   
 - [x] **6. Discord線上通知 (Discord Notification)**
   * 將抓到的資料，彙整完畢後傳送到discord進行通知
-  * 測試用頻道: 
+  * 測試用頻道: https://discord.gg/sScQvzXjB
   * 目前僅提供每日若有特殊狀況要求公開前一個月的財務狀況者，提供公司名稱/代號 及 每股盈餘
 
 ---

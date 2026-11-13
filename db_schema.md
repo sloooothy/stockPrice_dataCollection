@@ -27,7 +27,7 @@
 
 ### 2. `dailyData` - 每日交易與籌碼表
 
-#### 2.1 原始預定資料規格
+#### 預定資料規格
 * `sid` *(VARCHAR)* **[CPK]** - 股票代號
 * `priceDate` *(DATE)* **[CPK]** - 擷取股價日期 (`YYYY-MM-DD`)
 * `OpenPrice` *(DECIMAL)* - 開盤價
@@ -40,15 +40,11 @@
 * `DealerNetBuy` *(BIGINT)* - 自營商當日買賣超淨額
 * `RetailVolume` *(BIGINT)* - 散戶交易量 / 融資券異動
 
-#### 2.2 實作狀況與缺口說明
-* ✅ **已成功實作抓取：** `sid`, `priceDate`, `OpenPrice`, `ClosePrice`, `highPrice`, `lowPrice`, `ttlVolume`, `ForeignNetBuy`, `TrustNetBuy`, `DealerNetBuy`, `RetailVolume` (由成交量減三大法人計算估算值)
-* ⚠️ **需額外擴充抓取：** 精準 `RetailVolume` / 融資券異動（需額外串接 TWSE `MI_MARGIN` 融資融券餘額 API）
-
 ---
 
 ### 3. `monthlyData` - 月度基本面與籌碼表
 
-#### 3.1 原始預定資料規格
+#### 預定資料規格
 * `sid` *(VARCHAR)* **[CPK]** - 股票代號
 * `year` *(SMALLINT)* **[CPK]** - 資料擷取年份 (`YYYY`)
 * `month` *(TINYINT)* **[CPK]** - 資料擷取月份 (`1-12`)
@@ -65,19 +61,11 @@
   * `totalShareholders` *(INT)* - 總股東人數
   * `largeShareholderRatio` *(DECIMAL)* - 大戶持股比例 (%)（如 1000 張以上）
   * `retailShareholderRatio` *(DECIMAL)* - 散戶持股比例 (%)（如 50 張以下）
-
-#### 3.2 實作狀況與缺口說明
-* ✅ **已成功實作抓取：**
-  * **企業營收 (MOPS)：** `revenue`, `revenueMoM`, `revenueYoY`, `accRevenue`, `accRevenueYoY`
-* ⚠️ **需額外擴充抓取：**
-  * **董監內部人籌碼 (MOPS)：** `insiderHoldingRatio`, `insiderPledgeRatio`（需爬取 MOPS 董監持股頁面）
-  * **股權分散表 (TDCC)：** `totalShareholders`, `largeShareholderRatio`, `retailShareholderRatio`（需串接 TDCC 臺灣集中保管結算所 API / 網頁）
-
 ---
 
 ### 4. `quarterData` - 季度財務報表
 
-#### 4.1 原始預定資料規格
+#### 預定資料規格
 * `sid` *(VARCHAR)* **[CPK]** - 股票代號
 * `year` *(SMALLINT)* **[CPK]** - 資料擷取年份 (`YYYY`)
 * `quarter` *(TINYINT)* **[CPK]** - 資料擷取季度 (`1-4`)
@@ -100,17 +88,11 @@
   * `freeCashFlow` *(BIGINT)* - 自由現金流量
   * `cashFlowRatio` *(DECIMAL)* - 營業現金流對淨利比 (%)
 
-#### 4.2 實作狀況與缺口說明
-* ✅ **已成功實作抓取：**
-  * **獲利能力指標 (損益表)：** `eps`, `operatingMargin`（由營業利益與營收估算）
-* ⚠️ **需額外擴充抓取：**
-  * **獲利能力指標：** `epsYoY`, `grossMargin`, `netMargin`, `roe`, `roa`
-  * **財務結構與安全度：** `bookValuePerShare`, `debtRatio`, `currentRatio`, `quickRatio`, `inventoryTurnoverDays`（需爬取 MOPS 資產負債表與相關指標頁面）
-  * **現金流量品質：** `operatingCashFlow`, `freeCashFlow`, `cashFlowRatio`（需爬取 MOPS 現金流量表）
 ---
 
 ### 5. `tradingNotice` - 被迫公告資訊
 * **sid** (VARCHAR) - 股票代號 [Composite Primary Key]
+* **sname** (VARCHAR) - 股票名稱 
 * **noticeDate** (DATE) - 公告擷取日期 (YYYY-MM-DD) [Composite Primary Key]
 * **eventDate** (DATE) - 事實發生日 (YYYY-MM-DD)
 
