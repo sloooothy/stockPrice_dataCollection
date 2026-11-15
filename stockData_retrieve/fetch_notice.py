@@ -219,7 +219,7 @@ def fetch_note(mops_year: str, mops_month: str, mops_day:str):
     finally:
         driver.quit()
 
-# ── 1. 參數解析與時間邏輯判定 ──────────────────────────────
+# ── 參數解析與時間邏輯判定 ──────────────────────────────
 def get_target_date():
     """
     fetch input dates (includes year month date), defaults to today if missing or invalid.

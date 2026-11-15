@@ -31,4 +31,4 @@ jobs:
         env: # 這裡保留這支程式獨有的 secret（會與 Job 層級的共用變數合併）
             DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
             GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python stockData_retrieve/fetch_notice.py
+        run: python stockData_retrieve/fetch_notice.py -yy 115 -mm 11 -dd 12 #test
