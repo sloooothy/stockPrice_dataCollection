@@ -91,10 +91,12 @@
 ---
 
 ### 5. `tradingNotice` - 被迫公告資訊
-* **sid** (VARCHAR) - 股票代號 [Composite Primary Key]
+* **sid** (VARCHAR) - 股票代號 
 * **sname** (VARCHAR) - 股票名稱 
-* **noticeDate** (DATE) - 公告擷取日期 (YYYY-MM-DD) [Composite Primary Key]
+* **noticeDate** (DATE) - 公告公布日期 (YYYY-MM-DD) 
 * **eventDate** (DATE) - 事實發生日 (YYYY-MM-DD)
+* **eps": eps_val** (Float) - 每股盈餘 
+* **fetchDate** (DATE) - 資料抓取日 (YYYY-MM-DD) [key]
 
 * **單月最新自結數 (僅存月報尚未公佈的最新月份)**
   * **selfMonth** (VARCHAR) - 自結月份 (例如: '2026-07')

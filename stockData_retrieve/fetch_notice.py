@@ -18,12 +18,14 @@ import csv
 import re
 import os
 
-from MongoDB_op import upsertDB_byQuery
+from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
+from inform_discord import discord_sendpost, gen_AnalyzedRes
 
 load_dotenv()
 DB_NAME = os.environ.get("DB_NAME")
 NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL") #webhook
 
 def _init_driver(debug=False):
     options = Options()
@@ -77,13 +79,19 @@ def parse_single_financial_block(block):
     if eps_match:
         raw_eps = eps_match.group(1).strip()
         eps_val = convert_negative_number(raw_eps)
+        
+    # 資料擷取(程序啟動)日期
+    today = datetime.date.today()
+    roc_year = today.year - 1911
+    date_str=f"{roc_year}/{today.strftime('%m/%d')}"
 
     return {
         "sid": stock_code,
         "sname": company_name,
-        "announceDate": announce_date_str,
-        "notice_date": month_str,
+        "noticeDate": announce_date_str,
+        "eventDate": month_str,
         "eps": eps_val,
+        "fetchDate":date_str  
     }
     
 
@@ -132,7 +140,7 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
         rows = soup.find_all('tr')
         
         target_indices = []
-        includ_keywords = ['公司有價證券','公布注意交易資訊標準']
+        includ_keywords = ['注意交易']
         exclud_Keywords = ['公司債','終止上市'] #新增主旨排除條件
 
         for idx, row in enumerate(rows):
@@ -180,8 +188,8 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
                         # 用 股票代號 + 公告月份 + 公告時間 作為識條件
                         filter_query = {
                             "sid": single_data["sid"], 
-                            "notice_date": single_data["notice_date"],
-                            "announceDate": single_data["announceDate"]
+                            "noticeDate": single_data["noticeDate"],
+                            "eventDate": single_data["eventDate"]
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
                         upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
@@ -272,11 +280,50 @@ def convert_negative_number(num_str):
         return "-" + num_str[1:-1]
     return num_str
 
+def send_info(ai_req=False):
+
+    #今日日期
+    today = datetime.date.today()
+    roc_year = today.year - 1911
+    date_str=f"{roc_year}/{today.strftime('%m/%d')}"
+    
+    query={"fetchDate": f"{date_str}"}
+    
+    res_list=readDB_byQuery(DB_NAME,NOTICE_COLLECTION,query)
+    #print(res_list)
+    for stockInfo in res_list: #抓取股票資訊
+        message=""
+        stock_ID=stockInfo['sid']+".TW"
+        sname=stockInfo['sname']
+        if (ai_req):
+            prompt = f"""
+                你是一位專業的台股分析師。請針對 {sname}({stock_ID})
+                分析今天的狀況
+                1. 1 個技術面/籌碼面優點
+                2. 1 個潛在風險或缺點
+                3. 簡短結論（50字以內）
+                語氣簡明扼要，適合手機閱讀。
+            """
+            ai_analysis=gen_AnalyzedRes(prompt)
+            # 組成 Discord 訊息並發送
+            message = f"📊 **【台股分析報告】**\n\n{ai_analysis}"
+        else:
+            message=f"""
+            【財務公告訊息】
+            公告日期:{stockInfo['noticeDate']}
+            公司名稱:{stockInfo['sname']}
+            公司代號:{stockInfo['sid']}
+            EPS:{stockInfo['eps']}
+            EPS公告月份:{stockInfo['eventDate']}
+            """
+        discord_sendpost(DISCORD_WEBHOOK_URL, message)
+
 ##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
-    #date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
+    date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
     fetch_note(yyyy, mmmm, dddd)
+    send_info()
     
 
            
