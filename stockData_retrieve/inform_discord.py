@@ -25,21 +25,13 @@ def get_lastestModel(manual=False):
     
     return latest_flash_model
         
-def gen_AnalyzedRes(GEMINI_API_KEY,stockInfo):
-    stock_ID=stockInfo['sid']+".TW"
-    sname=stockInfo['sname']
+def gen_AnalyzedRes(prompt):
+    #read api key
+    load_dotenv()
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")# gemini api
     
     #  呼叫 Gemini API 進行分析
     client = genai.Client(api_key=GEMINI_API_KEY)
-
-    prompt = f"""
-        你是一位專業的台股分析師。請針對 {sname}({stock_ID})
-        分析今天的狀況
-        1. 1 個技術面/籌碼面優點
-        2. 1 個潛在風險或缺點
-        3. 簡短結論（50字以內）
-        語氣簡明扼要，適合手機閱讀。
-    """
 
     response = client.models.generate_content(
         model=get_lastestModel(True),
@@ -52,7 +44,7 @@ def discord_sendpost(DISCORD_WEBHOOK_URL, msg):
     payload = {
             "content": msg
         }
-        
+    #send to discord by post
     res = requests.post(DISCORD_WEBHOOK_URL, json=payload)
 
     if res.status_code == 204:
@@ -63,7 +55,7 @@ def discord_sendpost(DISCORD_WEBHOOK_URL, msg):
 
 def send_info(ai_req=False):
     # 載入環境變數
-    load_dotenv()
+    
     DB_NAME = os.environ.get("DB_NAME")
     NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
     #今日日期
@@ -75,10 +67,19 @@ def send_info(ai_req=False):
     #print(res_list)
     for stockInfo in res_list: #抓取股票資訊
         message=""
+        stock_ID=stockInfo['sid']+".TW"
+        sname=stockInfo['sname']
         if (ai_req):
-            GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")# gemini api
-            ai_analysis=gen_AnalyzedRes(GEMINI_API_KEY,stockInfo)
-            # 4. 組成 Discord 訊息並發送
+            prompt = f"""
+                你是一位專業的台股分析師。請針對 {sname}({stock_ID})
+                分析今天的狀況
+                1. 1 個技術面/籌碼面優點
+                2. 1 個潛在風險或缺點
+                3. 簡短結論（50字以內）
+                語氣簡明扼要，適合手機閱讀。
+            """
+            ai_analysis=gen_AnalyzedRes(prompt)
+            # 組成 Discord 訊息並發送
             message = f"📊 **【台股分析報告】**\n\n{ai_analysis}"
         else:
             message=f"""

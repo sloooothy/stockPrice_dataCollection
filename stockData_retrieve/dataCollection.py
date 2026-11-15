@@ -129,7 +129,7 @@ def get_gcis_business(coTax_id):
     print(f"利用公司統編查詢商業相關資料")
     return ""
     
-# --- 1. TWSE 日資料抓取與清洗 ---
+# --- TWSE 日資料抓取與清洗 ---
 def fetch_twse_all_data(target_date_str: str) -> pd.DataFrame:
     """
     抓取 TWSE 個股行情與三大法人買賣超，並進行欄位合併與轉換

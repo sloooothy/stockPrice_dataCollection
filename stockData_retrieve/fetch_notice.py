@@ -25,9 +25,10 @@ load_dotenv()
 DB_NAME = os.environ.get("DB_NAME")
 NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 
-def _init_driver():
+def _init_driver(debug=False):
     options = Options()
-    options.add_argument("--headless=new") # 若需看過程(debug)請把本行註解
+    if not debug:
+        options.add_argument("--headless=new") # 若需看過程(debug)請把本行註解
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920,1080")
@@ -131,7 +132,7 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
         rows = soup.find_all('tr')
         
         target_indices = []
-        includ_keywords = ['公司有價證券']
+        includ_keywords = ['公司有價證券','公布注意交易資訊標準']
         exclud_Keywords = ['公司債','終止上市'] #新增主旨排除條件
 
         for idx, row in enumerate(rows):
