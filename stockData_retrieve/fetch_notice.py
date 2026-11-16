@@ -1,10 +1,11 @@
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
+
+from mops_crawler import MopsCrawler
+#元素操作套件
+from selenium.webdriver.common.by import By # By (定位網頁元素)
+from selenium.webdriver.support import expected_conditions as EC # EC (配合 wait 判斷條件)
+from selenium.webdriver.support.ui import Select #  Select (處理網頁下拉選單)
+
 from io import StringIO
 import time
 import random
@@ -27,28 +28,12 @@ DB_NAME = os.environ.get("DB_NAME")
 NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL") #webhook
 
-def _init_driver(debug=False):
-    options = Options()
-    if not debug:
-        options.add_argument("--headless=new") # 若需看過程(debug)請把本行註解
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--window-size=1920,1080")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    
-    driver = webdriver.Chrome(options=options)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    })
-    return driver
 
 def parse_single_financial_block(block):
     """專門解析單一區塊文字的輔助函式"""
     # 1. 事實發生日
     announce_date_str = ""
-    date_match = re.search(r"1\.事實發生日[：:\s]*([1-9]\d{2}/\d{2}/\d{2})", block)
+    date_match = re.search(r"事實發生日[：:\s]*([1-9]\d{2}/\d{2}/\d{2})", block)
     if date_match:
         announce_date_str = date_match.group(1).strip()
 
@@ -67,13 +52,13 @@ def parse_single_financial_block(block):
     else:
         fin_block = block
 
-    # 4. 最近月份
+    # 4. 自結算月份
     month_str = ""
     m_search = re.search(r"11\d年\d{1,2}月|11\d/\d{2}", fin_block)
     if m_search:
         month_str = convert_date_format(m_search.group(0))
 
-    # 5. EPS
+    # 5. 自結算月份EPS
     eps_val = ""
     eps_match = re.search(r"每股盈餘[\s\S]*?([-\(\)\（\）\.\d]*\d[-\(\)\（\）\.\d]*)", fin_block)
     if eps_match:
@@ -95,7 +80,7 @@ def parse_single_financial_block(block):
     }
     
 
-def execute_and_save_mops_data(driver, wait, year, month, day):
+def execute_notice_mops_data(driver, wait, year, month, day):
     """執行 MOPS 查詢，邊爬邊即時 upsert 寫入 MongoDB，避免記憶體爆掉"""
     main_window = driver.current_window_handle
     driver.get("https://mops.twse.com.tw/mops/#/web/t05st02")
@@ -134,7 +119,8 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
 
         if not found_data:
             print("⚠️ 未偵測到預期的資料結構。")
-            return
+            #return
+            exit()
 
         soup = BeautifulSoup(final_html, 'html.parser')
         rows = soup.find_all('tr')
@@ -210,15 +196,14 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
         print(f"💥 執行過程發生錯誤: {e}")
 
 
-
 def fetch_note(mops_year: str, mops_month: str, mops_day:str):
-    driver = _init_driver()
-    wait = WebDriverWait(driver, 30)
-
+    crawler=MopsCrawler()
+    driver = crawler.driver
+    wait=crawler.wait
     try:
-        execute_and_save_mops_data(driver, wait, mops_year, mops_month, mops_day)
+        execute_notice_mops_data(driver, wait, mops_year, mops_month, mops_day)
     finally:
-        driver.quit()
+        crawler.close()
 
 # ── 參數解析與時間邏輯判定 ──────────────────────────────
 def get_target_date():
@@ -288,7 +273,9 @@ def send_info(ai_req=False):
     roc_year = today.year - 1911
     date_str=f"{roc_year}/{today.strftime('%m/%d')}"
     
-    query={"fetchDate": f"{date_str}"}
+    query={
+        "fetchDate": f"{date_str}",
+    }
     
     res_list=readDB_byQuery(DB_NAME,NOTICE_COLLECTION,query)
     #print(res_list)
@@ -322,7 +309,7 @@ def send_info(ai_req=False):
 ##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
-    #date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
+    date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
     fetch_note(yyyy, mmmm, dddd)
     send_info()
     
