@@ -3,7 +3,7 @@ import requests
 from google import genai
 from dotenv import load_dotenv
 
-from MongoDB_op import readDB_byQuery
+
 
 
 def get_lastestModel(manual=False):

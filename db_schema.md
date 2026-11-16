@@ -90,17 +90,20 @@
 
 ---
 
-### 5. `tradingNotice` - 被迫公告資訊
+### 5. `tradingNotice` - 於集中交易市場達公布注意交易資訊
 * **sid** (VARCHAR) - 股票代號 
 * **sname** (VARCHAR) - 股票名稱 
 * **noticeDate** (DATE) - 公告公布日期 (YYYY-MM-DD) 
-* **eventDate** (DATE) - 事實發生日 (YYYY-MM-DD)
-* **eps": eps_val** (Float) - 每股盈餘 
+* **selfMonth** (DATE) - 公告自結算月份 (例如: '115/07')
+* **selfMonthEPS** (FLOAT) - 公告月 EPS (元)
+
 * **fetchDate** (DATE) - 資料抓取日 (YYYY-MM-DD) [key]
 
-* **單月最新自結數 (僅存月報尚未公佈的最新月份)**
-  * **selfMonth** (VARCHAR) - 自結月份 (例如: '2026-07')
-  * **selfMonthRevenue** (BIGINT) - 當月自結營收 (百萬元)
-  * **selfMonthNetProfit** (BIGINT) - 當月歸屬母公司淨利 (百萬元)
-  * **selfMonthEPS** (DECIMAL) - 當月自結 EPS (元)
-  * **selfMonthEPSYoY** (DECIMAL) - 當月 EPS 年增率 (%)
+#### 未完成
+* **selfMonthRevenue** (FLOAT) - 公告月自結營業收入 (百萬元)
+* **selfMonthNetProfit** (FLOAT) - 公告月歸屬母公司淨利 (百萬元)
+* **selfMonthEPSYoY** (DECIMAL) - 公告月 EPS 年增率 (%)
+
+  
+  
+

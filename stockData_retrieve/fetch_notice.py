@@ -21,7 +21,7 @@ import os
 from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
 from inform_discord import discord_sendpost, gen_AnalyzedRes
-
+#環境變數
 load_dotenv()
 DB_NAME = os.environ.get("DB_NAME")
 NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
@@ -89,8 +89,8 @@ def parse_single_financial_block(block):
         "sid": stock_code,
         "sname": company_name,
         "noticeDate": announce_date_str,
-        "eventDate": month_str,
-        "eps": eps_val,
+        "selfMonth": month_str,
+        "selfMonthEPS": eps_val,
         "fetchDate":date_str  
     }
     
@@ -152,7 +152,8 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
 
         if not target_indices:
             print("⚠️ 沒有找到符合條件的新聞。")
-            return
+            #return
+            exit()
 
         print(f"📋 共找到 {len(target_indices)} 筆符合條件的新聞，開始邊爬邊寫入 MongoDB...")
 
@@ -189,7 +190,7 @@ def execute_and_save_mops_data(driver, wait, year, month, day):
                         filter_query = {
                             "sid": single_data["sid"], 
                             "noticeDate": single_data["noticeDate"],
-                            "eventDate": single_data["eventDate"]
+                            "selfMonth": single_data["selfMonth"]
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
                         upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
@@ -313,15 +314,15 @@ def send_info(ai_req=False):
             公告日期:{stockInfo['noticeDate']}
             公司名稱:{stockInfo['sname']}
             公司代號:{stockInfo['sid']}
-            EPS:{stockInfo['eps']}
-            EPS公告月份:{stockInfo['eventDate']}
+            EPS:{stockInfo['selfMonthEPS']}
+            EPS公告月份:{stockInfo['selfMonth']}
             """
         discord_sendpost(DISCORD_WEBHOOK_URL, message)
 
 ##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
-    date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
+    #date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
     fetch_note(yyyy, mmmm, dddd)
     send_info()
     
