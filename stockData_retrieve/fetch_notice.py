@@ -1,6 +1,5 @@
-import pandas as pd
-
 from mops_crawler import MopsCrawler
+
 #元素操作套件
 from selenium.webdriver.common.by import By # By (定位網頁元素)
 from selenium.webdriver.support import expected_conditions as EC # EC (配合 wait 判斷條件)
@@ -14,21 +13,21 @@ import datetime
 from pymongo.errors import ServerSelectionTimeoutError
 
 from bs4 import BeautifulSoup
-
-import csv
+#import pandas as pd #改單筆 不再使用
 import re
 import os
 
 from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
 from inform_discord import discord_sendpost, gen_AnalyzedRes
+
 #環境變數
 load_dotenv()
 DB_NAME = os.environ.get("DB_NAME")
 NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL") #webhook
 
-
+# 資料獲取與解析
 def parse_single_financial_block(block):
     """專門解析單一區塊文字的輔助函式"""
     # 1. 事實發生日
@@ -171,7 +170,7 @@ def execute_notice_mops_data(driver, wait, year, month, day):
                     single_data = parse_single_financial_block(detail_content)
                     
                     if single_data and single_data.get("sid"):
-                        # 🎯 關鍵：即時進行 Upsert 寫入資料庫
+                        # 即時進行 Upsert 寫入資料庫
                         # 用 股票代號 + 公告月份 + 公告時間 作為識條件
                         filter_query = {
                             "sid": single_data["sid"], 
@@ -180,7 +179,7 @@ def execute_notice_mops_data(driver, wait, year, month, day):
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
                         upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
-                        print(f"💾 [即時寫入] 公司 {single_data['sid']} ({single_data['sname']}) 資料已同步！")
+                        print(f" 公司 {single_data['sid']} ({single_data['sname']}) 資料已同步！")
                     
                     driver.close()
                     driver.switch_to.window(main_window)
@@ -196,14 +195,6 @@ def execute_notice_mops_data(driver, wait, year, month, day):
         print(f"💥 執行過程發生錯誤: {e}")
 
 
-def fetch_note(mops_year: str, mops_month: str, mops_day:str):
-    crawler=MopsCrawler()
-    driver = crawler.driver
-    wait=crawler.wait
-    try:
-        execute_notice_mops_data(driver, wait, mops_year, mops_month, mops_day)
-    finally:
-        crawler.close()
 
 # ── 參數解析與時間邏輯判定 ──────────────────────────────
 def get_target_date():
@@ -265,10 +256,10 @@ def convert_negative_number(num_str):
     if num_str.startswith("(") and num_str.endswith(")"):
         return "-" + num_str[1:-1]
     return num_str
-
+    
+# ── 資料通知 (Discord)──────────────────────────────
 def send_info(ai_req=False):
-
-    #今日日期
+    #今日日期作為寫入日期
     today = datetime.date.today()
     roc_year = today.year - 1911
     date_str=f"{roc_year}/{today.strftime('%m/%d')}"
@@ -306,10 +297,20 @@ def send_info(ai_req=False):
             """
         discord_sendpost(DISCORD_WEBHOOK_URL, message)
 
+# ── 執行 ──────────────────────────────
+def fetch_note(mops_year: str, mops_month: str, mops_day:str):
+    with MopsCrawler(timeout=30) as crawler:
+        driver = crawler.driver
+        wait=crawler.wait
+        try:
+            execute_notice_mops_data(driver, wait, mops_year, mops_month, mops_day)
+        finally:
+            crawler.close()
+
 ##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
-    date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
+    #date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
     fetch_note(yyyy, mmmm, dddd)
     send_info()
     
