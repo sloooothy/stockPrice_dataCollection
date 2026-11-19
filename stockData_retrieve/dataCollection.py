@@ -1,133 +1,115 @@
 import os
 import time
 import requests
-import pandas as pd
-from datetime import datetime, timedelta
-import io
-from io import StringIO
+
 from mops_crawler import MopsCrawler
+from selenium.webdriver.common.by import By # By (定位網頁元素)
+from selenium.webdriver.support import expected_conditions as EC # EC (配合 wait 判斷條件)
 
 from bs4 import BeautifulSoup
 
-from tqdm import tqdm
 from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
 
+#environment variable
+load_dotenv()
+DB_NAME = os.environ.get("DB_NAME")
+
+# request 
+def req_json(url):
+    headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.twse.com.tw/' 
+        }
+    res = requests.get(url_mak, headers=headers, timeout=10)
+    return res.json()
+
+
 #============================
-# --- 0. TWSE 公司基本資料 ---
+# --- 公司基本資料 ---
 # 資料來源: https://openapi.twse.com.tw/#/
 #============================
 def fetch_stock_info():
     """
-    抓取上市櫃公司清單 寫入database
+    抓取上市與上櫃公司清單並寫入 database
     """
-    # 抓取上市公司基本資料
-    url_listed = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
-    try:
-        res = requests.get(url_listed, timeout=10)
-        listed_data = res.json()
-        for item in listed_data:
-            sid = item.get('公司代號')
-            # 先初步過濾，確保是 4 位數股票代號
-            if sid and str(sid).isdigit() and len(str(sid)) == 4:
-                data_line={
-                    'sid': str(sid),
-                    's_name': item.get('公司名稱'),
-                    's_status': 1  # 正常上市
-                }
-                #exist sid
-                query_line={
-                    'sid': str(sid)
-                }
-                #write back to database
-                load_dotenv()
-                DB_NAME = os.environ.get("DB_NAME")
-                BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
-                upsertDB_byQuery(DB_NAME, BASEINFO_COLLECTION, {"$set": data_line}, query_line)
-                
+    markets = [
+        {"mak_type": "上市", "url": "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"},
+        {"mak_type": "上櫃", "url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"}
+    ]
 
-    except Exception as e:
-        print(f"抓取上市公司清單失敗: {e}")
-
-    # 抓取上櫃公司基本資料
-    url_otc = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
-    try:
-        res = requests.get(url_otc, timeout=10)
-        otc_data = res.json()
-        for item in otc_data:
-            sid = item.get('SecuritiesCompanyCode') or item.get('公司代號')
-            if sid and str(sid).isdigit() and len(str(sid)) == 4:
-                data_line={
-                    'sid': str(sid),
-                    's_name': item.get('CompanyName') or item.get('公司名稱'),
-                    's_status': 1  # 正常上櫃
-                }
-                
-                #exist sid
-                query_line={
-                    'sid': str(sid)
-                }
-                
-                #write back to database
-                load_dotenv()
-                DB_NAME = os.environ.get("DB_NAME")
-                BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
-                upsertDB_byQuery(DB_NAME, BASEINFO_COLLECTION, {"$set": data_line}, query_line)
-                
-    except Exception as e:
-        print(f"抓取上櫃公司清單失敗: {e}")
-
-def fetch_stock_duty():
-    """
-    從資料庫讀取上市櫃公司清單 確認主要經營業務後 回database 更新 's_mainDuty'
-    最終: # df_base = pd.DataFrame(columns=['sid', 's_name', 's_mainDuty', 's_status'])
-    """
-    # 逐筆透過 WebDriver 爬取主要業務
-    query={"s_status": 1 }
-    load_dotenv()
-    DB_NAME = os.environ.get("DB_NAME")
     BASEINFO_COLLECTION = os.environ.get("BASEINFO_COLLECTION")
-    
-    res_list=readDB_byQuery(DB_NAME,NOTICE_COLLECTION)
-    
-    # 使用 tqdm 包覆迭代過程，顯示即時進度條
-    for row in res_list:
-        sid = row['sid']
-        
-        # 呼叫你寫好的 crawler 抓取業務
-        duty = get_company_duty_from_mops(sid)
-        duty_line={'s_mainDuty':duty}
-        filter_query={'sid':sid}
-        upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": duty_line}, filter_query)
-        
-        # 隨機緩衝，避免請求太快被封鎖
-        time.sleep(1.0)
 
-    # 整理成最終需要的欄位結構
-    '''
-    stock_info = pd.DataFrame({
-        'sid': df_base['sid'],
-        's_name': df_base['s_name'],
-        's_mainDuty': df_base['s_mainDuty'],
-        's_status': df_base['s_status']
-    })
-    
-    return stock_info
-    '''
+    for m in markets:
+        mak_type = m["mak_type"]
+        url_mak = m["url"]
+        try:
+            listed_data=req_json(url_mak)
+            for item in listed_data:
+                sid = item.get('SecuritiesCompanyCode') or item.get('公司代號')
+                if sid and str(sid).isdigit() and len(str(sid)) == 4:
+                    data_line = {
+                        'sid': str(sid),
+                        's_fullname': item.get('CompanyName') or item.get('公司名稱'),
+                        's_name': item.get('CompanyAbbreviation') or item.get('公司簡稱')
+                    }
+                    
+                    query_line = {
+                        'sid': str(sid)
+                    }
+                    
+                    # 更新資料庫
+                    upsertDB_byQuery(DB_NAME, BASEINFO_COLLECTION, {"$set": data_line}, query_line)
+                    
+        except Exception as e:
+            print(f"抓取{mak_type}公司清單失敗: {e}")
 
-def get_company_duty_from_mops(sid):
-    
-    # 使用 with 語法，執行完畢會自動關閉瀏覽器
-    with  MopsCrawler(headless=True) as crawler:
-        single_result = crawler.fetch_business(sid)
-        #print(single_result)
-        return single_result
+#============================
+# --- 確認公司主要經營業務 ---
+# 資料來源: https://mopsov.twse.com.tw/mops/web/t05st03
+#============================
 
-def get_gcis_business(coTax_id):
-    # 資料來源: data.gcis.nat.gov.tw/od/data/api
-    # TODO: 利用公司統編查詢商業相關資料
-    print(f"利用公司統編查詢商業相關資料")
-    return ""
+def fetch_stock_duty(sid):
+    """
+        根據股票編號 確認主要經營業務後 回database 更新 's_mainDuty'
+    """
+    #來源
+    target_url = "https://mopsov.twse.com.tw/mops/web/t05st03"
+    # 逐筆透過 WebDriver 爬取主要業務
+    with MopsCrawler(timeout=10) as driver:
+        main_window = driver.current_window_handle
+        driver.get(target_url)
+            
+        # 1. 定位輸入框、清空並輸入新代號
+        search_input= EC.presence_of_element_located((By.ID, "co_id"))
+        search_input.click()
+        search_input.clear()
+        search_input.send_keys(str(sid))
+            
+        # 2. 在觸發新 AJAX 查詢前，先用 JS 把畫面上舊的表格區域清空！
+        # 這樣能強迫畫面進入「等待載入」狀態，絕不會誤抓上一筆資料
+        driver.execute_script("""
+            var oldTable = document.getElementById('table01');
+            if (oldTable) { oldTable.innerHTML = ''; }
+        """)
+            
+        # 3. 觸發 AJAX 查詢
+        driver.execute_script("doAction(); ajax1(document.form1, 'table01');")
+            
+        # 4. 等待新的「主要經營業務」欄位重新長出來且有內容
+        #  使用 XPath 精準定位：找文字是「主要經營業務」的 th，然後找它隔壁的兄弟元素 td
+        element = crawler.wait.until(
+            EC.presence_of_element_located(
+                (By.XPath, "//th[normalize-space()='主要經營業務']/following-sibling::td")
+            )
+        )
+
+        # 取得文字（<br> 會自動轉為 \n）
+        business_text = element.text
+        print(business_text)
+
+        except Exception as e:
+            return f"Error [{stock_code}]: 無法取得資料，原因可能為代碼不存在或請求遭阻擋。"
     
 # --- TWSE 日資料抓取與清洗 ---
 def fetch_twse_all_data(target_date_str: str) -> pd.DataFrame:

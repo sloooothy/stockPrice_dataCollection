@@ -1,5 +1,4 @@
 from mops_crawler import MopsCrawler
-
 #元素操作套件
 from selenium.webdriver.common.by import By # By (定位網頁元素)
 from selenium.webdriver.support import expected_conditions as EC # EC (配合 wait 判斷條件)
@@ -126,7 +125,7 @@ def execute_notice_mops_data(driver, wait, year, month, day):
         
         target_indices = []
         includ_keywords = ['注意交易']
-        exclud_Keywords = ['公司債','終止上市'] #新增主旨排除條件
+        exclud_Keywords = ['債','終止上市'] #新增主旨排除條件
 
         for idx, row in enumerate(rows):
             subject_td = row.find('td', {'data-title': '主旨:'})
@@ -268,8 +267,10 @@ def send_info(ai_req=False):
         "fetchDate": f"{date_str}",
     }
     
+    # fetch data from database
     res_list=readDB_byQuery(DB_NAME,NOTICE_COLLECTION,query)
     #print(res_list)
+    
     for stockInfo in res_list: #抓取股票資訊
         message=""
         stock_ID=stockInfo['sid']+".TW"

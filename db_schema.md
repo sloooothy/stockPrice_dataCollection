@@ -20,7 +20,8 @@
 
 ### 1. `stock_info` - 股票基本資訊表
 * `sid` *(VARCHAR)* **[PK]** - 股票代號
-* `s_name` *(VARCHAR)* - 股票名稱
+* `s_fullname` *(VARCHAR)* - 公司名稱
+* `s_name` *(VARCHAR)* - 公司簡稱
 * `s_mainDuty` *(TEXT)* - 主要業務說明
 * `s_status` *(VARCHAR)* - 營業狀況（1 = 正常上市櫃，0 = 未上市或已下市）
 ---
@@ -94,7 +95,7 @@
 * **sid** (VARCHAR) - 股票代號 
 * **sname** (VARCHAR) - 股票名稱 
 * **noticeDate** (DATE) - 公告公布日期 (YYYY-MM-DD) 
-* **selfMonth** (DATE) - 公告自結算月份 (例如: '115/07')
+* **selfMonth** (DATE) - 公告Q (例如: '115/07')
 * **selfMonthEPS** (FLOAT) - 公告月 EPS (元)
 
 * **fetchDate** (DATE) - 資料抓取日 (YYYY-MM-DD) [key]
