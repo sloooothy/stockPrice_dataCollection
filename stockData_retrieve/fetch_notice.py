@@ -58,7 +58,8 @@ def parse_single_financial_block(block):
 
     # 5. 自結算月份EPS
     eps_val = ""
-    eps_match = re.search(r"每股盈餘[\s\S]*?([-\(\)\（\）\.\d]*\d[-\(\)\（\）\.\d]*)", fin_block)
+    pattern = r"每股[\s\S]{0,15}?盈餘[\s\S]*?([-\(\)\（\）\.\d]*\d[-\(\)\（\）\.\d]*)" # 因應每股盈餘中間多出文字的部分
+    eps_match = re.search(pattern, fin_block)
     if eps_match:
         raw_eps = eps_match.group(1).strip()
         eps_val = convert_negative_number(raw_eps)
