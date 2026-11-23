@@ -6,7 +6,7 @@
 
 ## 📌 專案架構與開發目標
 
-- [x] **1. 股票標的清單與每日數據源研究**
+- [ ] **1. 股票標的清單與每日數據源研究**
   * 使用 MOPS每日交易資訊，擷取全部上市（不含權證=ALLBUT0999）/上櫃股票之市場交易資訊。：
     `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={YYYYMMDD}&type=ALLBUT0999`
   * 📅 預定開發項目
