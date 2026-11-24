@@ -1,7 +1,9 @@
 import os
 from pymongo import MongoClient
+from pymongo import UpdateOne
 from pymongo.errors import ServerSelectionTimeoutError
 from dotenv import load_dotenv
+import pandas as pd
 
 def _initDB():
     try:
@@ -86,7 +88,69 @@ def readDB_byQuery(db_name, colleciotn_name, query_filter={}):
         db_client.close()
     
     return results_list
-        
+    
+# DB 寫入pd frame
+def writeDB_byPD(
+    db_name,
+    colleciotn_name,
+    pdframe: pd.DataFrame,
+    indexlist: list = None,
+    chunk_size: int = 1000,
+) -> bool:
+    
+    db_client = _initDB()
+
+    try:
+        if pdframe is None or pdframe.empty:
+            print(f"輸入資料為空，並未寫入任何資料")
+            return False
+
+        # 若未指定，預設 sid 作為更新準則
+        if not indexlist:
+            indexlist = ["sid"]
+
+        # 確認指定的欄位都存在於 DataFrame 中
+        missing_cols = [col for col in indexlist if col not in pdframe.columns]
+        if missing_cols:
+            raise ValueError(f"DataFrame 缺少指定的 index 欄位: {missing_cols}")
+
+        db = db_client[db_name]
+        collection = db[colleciotn_name]
+
+        records = pdframe.to_dict(orient="records")
+        operations = []
+
+        for row in records:
+            # 依 indexlist 動態組裝 filter 條件
+            filter_query = {}
+            for col in indexlist:
+                val = row[col]
+                # 如果是 sid，順手去除前後空白並確保字串型別，避免比對落差
+                if col == "sid" and val is not None:
+                    val = str(val).strip()
+                filter_query[col] = val
+
+            operations.append(
+                UpdateOne(
+                    filter=filter_query,
+                    update={"$set": row},
+                    upsert=True,
+                )
+            )
+
+        for i in range(0, len(operations), chunk_size):
+            batch = operations[i : i + chunk_size]
+            collection.bulk_write(batch, ordered=False)
+
+        return True
+
+    except Exception as e:
+        print(f"寫入 DB 失敗 [{db_name}.{colleciotn_name}]: {e}")
+        return False
+
+    finally:
+        if db_client is not None:
+            db_client.close()
     
 '''
 # DB write in test

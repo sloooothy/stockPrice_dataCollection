@@ -29,17 +29,14 @@
 ### 2. `dailyData` - 每日交易與籌碼表
 
 #### 預定資料規格
-* `sid` *(VARCHAR)* **[CPK]** - 股票代號
-* `priceDate` *(DATE)* **[CPK]** - 擷取股價日期 (`YYYY-MM-DD`)
-* `OpenPrice` *(DECIMAL)* - 開盤價
-* `ClosePrice` *(DECIMAL)* - 當日收盤價格
-* `highPrice` *(DECIMAL)* - 最高價
-* `lowPrice` *(DECIMAL)* - 最低價
-* `ttlVolume` *(BIGINT)* - 當日總成交量
-* `ForeignNetBuy` *(BIGINT)* - 外資當日買賣超淨額
-* `TrustNetBuy` *(BIGINT)* - 投信當日買賣超淨額
-* `DealerNetBuy` *(BIGINT)* - 自營商當日買賣超淨額
-* `RetailVolume` *(BIGINT)* - 散戶交易量 / 融資券異動
+* `sid` - 股票代號
+* `priceDate` - 擷取股價日期 (`YYYYMMDD`)
+* `closePrice`  - 收盤價
+* `priceChange`  - 漲跌幅數值 (+- num)
+* `ttlVolume` - 成交股數
+* `foreignNetBuy` - 外陸資買賣超股數(不含外資自營商)
+* `trustNetBuy`  - 投信買賣超股數
+* `dealerNetBuy` - 自營商買賣超股數
 
 ---
 
