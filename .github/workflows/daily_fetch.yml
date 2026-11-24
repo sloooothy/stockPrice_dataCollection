@@ -38,20 +38,20 @@ jobs:
           echo "Starting Python script execution..."
           python stockData_retrieve/fetch_daily.py
 
-#      - name: 4.5 Stage Files Manually
-#        run: |
-#          echo "--- File Status Check ---"
-#          # 偵錯：確認 json 資料夾的檔案生成狀況
-#          ls -la stockData/json/ || true
-#          git add stockData/json/
-#          git status
+      - name: 4.5 Stage Files Manually
+        run: |
+          echo "--- File Status Check ---"
+          # 偵錯：確認 json 資料夾的檔案生成狀況
+          ls -la stockData/json/ || true
+          git add stockData/json/
+          git status
 
-#      - name: 5. Auto Commit Updated JSON Files
-#        uses: stefanzweifel/git-auto-commit-action@v5
-#        with:
-#          commit_message: "feat: 自動新增每日股價 JSON 資料檔 (GitHub Actions)"
-#          # 比對 json 資料夾下的產出檔案
-#          file_pattern: |
-#            stockData/json/stock_daily_*.json
-#          commit_user_name: 'github-actions[bot]'
-#          commit_user_email: 'github-actions[bot]@users.noreply.github.com'
+      - name: 5. Auto Commit Updated JSON Files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "feat: 自動新增每日股價 JSON 資料檔 (GitHub Actions)"
+          # 比對 json 資料夾下的產出檔案
+          file_pattern: |
+            stockData/json/stock_daily_*.json
+          commit_user_name: 'github-actions[bot]'
+          commit_user_email: 'github-actions[bot]@users.noreply.github.com'

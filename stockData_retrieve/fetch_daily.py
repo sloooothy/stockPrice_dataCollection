@@ -84,10 +84,6 @@ def retrive_daily_data(target_date_str,debug_mode):
         else:
             print(f"每日行情: {data_p['stat']}, 使用日期:{target_date_str}")
             
-        if debug_mode:
-            print("每日行情data")
-            print(df_p)
-            
         time.sleep(3) # 避開 API 限流
     
         # 三大法人籌碼
@@ -128,10 +124,6 @@ def retrive_daily_data(target_date_str,debug_mode):
 
         else:
             print(f"三大法人籌碼: {data_p['stat']}, 使用日期:{target_date_str}")
-
-        if debug_mode:
-            print("三大法人籌碼data")
-            print(df_c)
                     
 
         #合併表 df_c and df_p       
@@ -162,9 +154,6 @@ def fetch_daily_data(debug=False):
     target_date_str=f"{yyyy}{mmmm}{dddd}"
     # 取得本日大盤資料
     res=retrive_daily_data(target_date_str, debug)
-    if debug:
-        print(res)
-        
         
     # 寫入DB
     load_dotenv()
@@ -172,16 +161,13 @@ def fetch_daily_data(debug=False):
     DAILY_COLLECTION = os.environ.get("DAILY_COLLECTION")
     if debug:
         file_res=  save_pddata_to_json(res,file_prefix=DAILY_COLLECTION,date_suffix=target_date_str)  
-        if db_res: 
+        if file_res: 
             print(f"寫入檔案成功: {DAILY_COLLECTION}{target_date_str}.json")
             
     db_res=writeDB_byPD(DB_NAME, DAILY_COLLECTION, pdframe=res, indexlist=['sid','priceDate'])
     if db_res: 
         print("寫入DB成功")
-            
-        
-        
-        
+
 # 漲跌幅處理===========================================================================================            
 def _extract_sign(val) -> int:
     """從漲跌(+/-)欄位萃取方向：上漲 1、下跌 -1、其餘 0"""
@@ -263,9 +249,9 @@ def combine_price_change(A: pd.Series, B: pd.Series) -> pd.Series:
 
     return pd.Series(result, index=s_dir.index, name="priceChange")
 
-            
+# ===========================================================================================               
 if __name__ == "__main__":
-    debug_mode=False
+    debug_mode=True
     fetch_daily_data(debug_mode)
     
         
