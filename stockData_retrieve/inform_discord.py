@@ -2,9 +2,7 @@ import os
 import requests
 from google import genai
 from dotenv import load_dotenv
-
-
-
+import time
 
 def get_lastestModel(manual=False):
     client = genai.Client()
@@ -46,9 +44,11 @@ def discord_sendpost(DISCORD_WEBHOOK_URL, msg):
         }
     #send to discord by post
     res = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+    time.sleep(random.uniform(0.1, 0.2))
 
     if res.status_code == 204:
         print("訊息已成功發送到 Discord！")
+        
     else:
         print("發送失敗：", res.text)
 
