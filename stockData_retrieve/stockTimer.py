@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from ReqFetcher import ReqFetcher
-
+# 常數設定 
+today = date.today()
 # --- 參數與日期驗證邏輯 ---
 def validate_daily_date(year, month, day, yr_roc=False):
     """
@@ -23,10 +24,8 @@ def validate_daily_date(year, month, day, yr_roc=False):
     return get_default_trading_date(roc=yr_roc)
   
 def get_default_trading_date(roc=False):
-    # 常數設定 
-    # 取得今天的西元日期作為預設值
-    today = date.today()
     
+    # 取得今天的西元日期作為預設值
     default_month = today.month
     default_date = today.day
     default_year = today.year
