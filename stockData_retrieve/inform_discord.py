@@ -3,6 +3,7 @@ import requests
 from google import genai
 from dotenv import load_dotenv
 import time
+import random
 
 def get_lastestModel(manual=False):
     client = genai.Client()
