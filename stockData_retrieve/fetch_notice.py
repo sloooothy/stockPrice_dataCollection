@@ -27,22 +27,7 @@ NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL") #webhook
 
 # 資料獲取與解析
-def parse_single_financial_block(block, debug=False):
-    """專門解析單一區塊文字的輔助函式"""
-    # 1. 事實發生日
-    announce_date_str = ""
-    date_match = re.search(r"事實發生日[：:\s]*([1-9]\d{2}/\d{2}/\d{2})", block)
-    if date_match:
-        announce_date_str = date_match.group(1).strip()
-
-    # 2. 股票編號與公司名稱
-    co_match = re.search(r"本資料由\s*[\(（](?:上市公司|上櫃公司)[\)）]\s*(\d{4})\s+([^\s]+)", block)
-    if not co_match:
-        return None
-    stock_code = co_match.group(1)
-    company_name = co_match.group(2)
-
-    # 3. 財務業務資訊區塊處理
+def pos_financial_datablock(block): # 重新定位財務業務資訊 最尾巴
     # (1) 找到「財務業務資訊」的位置（容許中間有空白或全形字）
     m_start = re.search(r"財\s*務\s*業\s*務\s*資\s*訊", block)
     if not m_start:
@@ -66,7 +51,26 @@ def parse_single_financial_block(block, debug=False):
         content = after_title[nl_pos + 1:] if nl_pos != -1 else after_title
 
     # (3) 清理開頭多餘的空白、換行或單獨殘留的右括號
-    fin_block = re.sub(r"^[\s\u3000）\)]+", "", content).strip()
+    return re.sub(r"^[\s\u3000）\)]+", "", content).strip()
+    
+    
+def parse_single_financial_block(block, debug=False):
+    """專門解析單一區塊文字的輔助函式"""
+    # 1. 事實發生日
+    announce_date_str = ""
+    date_match = re.search(r"事實發生日[：:\s]*([1-9]\d{2}/\d{2}/\d{2})", block)
+    if date_match:
+        announce_date_str = date_match.group(1).strip()
+
+    # 2. 股票編號與公司名稱
+    co_match = re.search(r"本資料由\s*[\(（](?:上市公司|上櫃公司)[\)）]\s*(\d{4})\s+([^\s]+)", block)
+    if not co_match:
+        return None
+    stock_code = co_match.group(1)
+    company_name = co_match.group(2)
+
+    # 3. 財務業務資訊區塊處理
+    fin_block = pos_financial_datablock(block)
 
     # 4. 自結算月份
     month_str = ""
@@ -79,6 +83,7 @@ def parse_single_financial_block(block, debug=False):
     pattern = r"每股[\s\S]{0,15}?盈餘[\s\S]*?([-\(\)\（\）\.\d]*\d[-\(\)\（\）\.\d]*)" # 因應每股盈餘中間多出文字的部分
     eps_match = re.search(pattern, fin_block)
     if debug:
+        print(f"自結算月份，公司:　{company_name}　({stock_code})")
         print(eps_match)
         
     if eps_match:
@@ -99,6 +104,72 @@ def parse_single_financial_block(block, debug=False):
         "fetchDate":date_str  
     }
     
+def filtering_subject(raw_data, includ_keywords = ['注意交易'], exclud_Keywords = ['債','終止上市'], correction_keywords = ["更正", "補正"]):
+    '''
+    新增主旨排除條件 exclud_Keywords
+    從新聞原始資料中，確認是否有新舊(更正)訊息，只保留新的主旨
+    '''
+    target_indices = []
+    matched_rows = []
+    for idx, row in enumerate(raw_data):
+        subject_td = row.find('td', {'data-title': '主旨:'})
+        if subject_td:
+            subject_text = subject_td.get_text(strip=True)
+            if any(kw in subject_text for kw in includ_keywords) and all(ekw not in subject_text for ekw in exclud_Keywords):
+                #target_indices.append(idx)
+                # 抓同列公司代號/名稱當分組依據（若表格沒有該欄位，就退回用主旨前幾個字當近似分組）
+                company_td = (
+                    row.find("td", {"data-title": "公司代號:"})
+                    or row.find("td", {"data-title": "公司:"})
+                    or row.find("td", {"data-title": "公司簡稱:"})
+                )
+                company_key = company_td.get_text(strip=True) if company_td else subject_text[:10]
+
+                matched_rows.append(
+                    {
+                        "idx": idx,
+                        "company": company_key,
+                        "subject": subject_text,
+                        "has_corr": any(ck in subject_text for ck in correction_keywords),
+                    }
+                )
+ 
+    # --- 主旨階段先篩一輪：同公司有多筆且有「更正/補正」主旨時，剔除沒寫更正的舊筆 ---
+    grouped = {}
+    for item in matched_rows:
+        grouped.setdefault(item["company"], []).append(item)
+
+    filtered_rows = []
+    for company, items in grouped.items():
+        if len(items) == 1:
+            filtered_rows.append(items[0])
+            continue
+
+        corr_only = [x for x in items if x["has_corr"]]
+        non_corr = [x for x in items if not x["has_corr"]]
+
+        # 只有當「有標註更正的筆數」且「也有未標註更正的筆數」時，才假設 non_corr 是舊筆並剔除
+        # 若全部都沒寫更正，代表可能是不同事項或尚未標註，先全部保留給 Selenium 看內容
+        if corr_only and non_corr:
+            # 若有多筆更正，依 idx 排序後取最新那筆（視表格由舊到新或新到舊，必要時可改 items）
+            corr_only.sort(key=lambda x: x["idx"])
+            filtered_rows.append(corr_only[-1])
+        else:
+            filtered_rows.extend(items)
+
+    # 恢復原本表格順序，產出給 Selenium 用的 target_indices
+    filtered_rows.sort(key=lambda x: x["idx"])
+    target_indices = [x["idx"] for x in filtered_rows]
+    
+    #確認最後結果
+    if not target_indices:
+        print("⚠️ 沒有找到符合條件的新聞。")
+        #return
+        exit()
+
+    print(f"📋 共找到 {len(target_indices)} 筆符合條件的新聞")
+    return target_indices
+
 
 def execute_notice_mops_data(driver, wait, year, month, day, debug=False):
     """執行 MOPS 查詢，邊爬邊即時 upsert 寫入 MongoDB，避免記憶體爆掉"""
@@ -145,26 +216,10 @@ def execute_notice_mops_data(driver, wait, year, month, day, debug=False):
         soup = BeautifulSoup(final_html, 'html.parser')
         rows = soup.find_all('tr')
         
-        target_indices = []
-        includ_keywords = ['注意交易']
-        exclud_Keywords = ['債','終止上市'] #新增主旨排除條件
-
-        for idx, row in enumerate(rows):
-            subject_td = row.find('td', {'data-title': '主旨:'})
-            if subject_td:
-                subject_text = subject_td.get_text(strip=True)
-                if any(kw in subject_text for kw in includ_keywords) and all(ekw not in subject_text for ekw in exclud_Keywords):
-                    target_indices.append(idx)
-
-        if not target_indices:
-            print("⚠️ 沒有找到符合條件的新聞。")
-            #return
-            exit()
-
-        print(f"📋 共找到 {len(target_indices)} 筆符合條件的新聞")
+        target_indices = filtering_subject(rows)
         if debug:
             print("除錯模式: 將開始確認fetching 內容")
-            
+
         # 2. 迴圈：抓取單筆 -> 解析單筆 -> 即時 Upsert
         for target_index in target_indices:
             try:
