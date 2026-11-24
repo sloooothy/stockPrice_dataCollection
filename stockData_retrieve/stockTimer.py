@@ -14,6 +14,8 @@ def validate_daily_date(year, month, day, yr_roc=False):
             # ✅ 轉成 .date() 比較，避開時區錯誤    
             parsed_date = datetime(year, month, day)
             if parsed_date.date() <= today :
+                if(yr_roc):#回復轉回
+                    year-=1911
                 return year,month,day
         else:
             print(f"[Timer Warning] 未取得日期參數，預設本日為交易日")
