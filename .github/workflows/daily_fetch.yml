@@ -1,13 +1,12 @@
 name: Daily Stock Data Fetcher
 
-# 設定排程：每天 UTC 時間 9 點執行 (大約是台灣時間下午 5 點)。
 on:
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
 
-#permissions:
-#  contents: write # 賦予 GITHUB_TOKEN 寫入 (commit/push) 倉庫內容的權限
+permissions:
+  contents: write
 
 jobs:
   fetch_and_commit:
@@ -17,15 +16,15 @@ jobs:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       DB_NAME: ${{ secrets.DB_NAME }}
       DAILY_COLLECTION: ${{ secrets.DAILY_COLLECTION }}
-      
+
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 2. Set up Python 3.11
+      - name: 2. Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -41,7 +40,6 @@ jobs:
       - name: 4.5 Stage Files Manually
         run: |
           echo "--- File Status Check ---"
-          # 偵錯：確認 json 資料夾的檔案生成狀況
           ls -la stockData/json/ || true
           git add stockData/json/
           git status
@@ -50,8 +48,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "feat: 自動新增每日股價 JSON 資料檔 (GitHub Actions)"
-          # 比對 json 資料夾下的產出檔案
           file_pattern: |
-            stockData/json/stock_daily_*.json
+            stockData/json/${{ env.DAILY_COLLECTION }}*.json
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
