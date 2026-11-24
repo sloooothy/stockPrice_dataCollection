@@ -294,14 +294,16 @@ def convert_negative_number(num_str):
     return num_str
     
 # ── 資料通知 (Discord)──────────────────────────────
-def send_info(ai_req=False):
-    #今日日期作為寫入日期
-    today = datetime.date.today()
-    roc_year = today.year - 1911
-    date_str=f"{roc_year}/{today.strftime('%m/%d')}"
-    
+def send_info(yyyy,mmmm,dddd,ai_req=False):
+    if yyyy is not None and mmmm is not None and dddd is not None:
+        date_str=f"{yyyy}/{mmmm}/{mmmm}"
+    else: #未指定今日日期作為寫入日期
+        today = datetime.date.today()
+        roc_year = today.year - 1911
+        date_str=f"{roc_year}/{today.strftime('%m/%d')}"
+        
     query={
-        "fetchDate": f"{date_str}",
+        "noticeDate": f"{date_str}",
     }
     
     # fetch data from database
@@ -357,7 +359,7 @@ def get_target_date():
     
 # ── 執行 ──────────────────────────────
 def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
-    with MopsCrawler(timeout=30) as crawler:
+    with MopsCrawler(headless=not debug_mode,timeout=30) as crawler:
         driver = crawler.driver
         wait=crawler.wait
         try:
@@ -365,7 +367,7 @@ def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
         finally:
             crawler.close()
             if not debug_mode:
-                send_info()
+                send_info(mops_year, mops_month, mops_day)
 
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
