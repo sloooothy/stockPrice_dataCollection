@@ -19,6 +19,7 @@ import os
 from MongoDB_op import upsertDB_byQuery, readDB_byQuery
 from dotenv import load_dotenv
 from inform_discord import discord_sendpost, gen_AnalyzedRes
+import stockTimer 
 
 #環境變數
 load_dotenv()
@@ -275,50 +276,6 @@ def execute_notice_mops_data(driver, wait, year, month, day, debug=False):
 
 
 
-# ── 參數解析與時間邏輯判定 ──────────────────────────────
-def get_target_date():
-    """
-    fetch input dates (includes year month date), defaults to today if missing or invalid.
-    '-yy', '--year', type=int, help='指定民國年分 (如: 115)'
-    '-mm', '--month', type=int, help='指定月份 (如: 1-12)'
-    '-dd', '--date', type=int, help='指定日期 (如: 1)'
-    """
-    parser = argparse.ArgumentParser(
-        prog='fetcg_notice.py',
-        description='自動抓取證交所公司新聞',
-        formatter_class=argparse.RawTextHelpFormatter
-    )
-    parser.add_argument('-yy', '--year', type=int, help='指定民國年分 (如: 115)')
-    parser.add_argument('-mm', '--month', type=int, help='指定月份 (如: 1-12)')
-    parser.add_argument('-dd', '--date', type=int, help='指定日期 (如: 1)')
-    args = parser.parse_args()
-
-    # 取得今天的西元日期，並換算成民國年格式作為預設值
-    today = datetime.date.today()
-    default_roc_year = today.year - 1911
-    default_month = today.month
-    default_date = today.day
-
-    # 檢查是否年、月、日皆有填寫
-    if args.year is not None and args.month is not None and args.date is not None:
-        try:
-            west_year = args.year + 1911  # 民國年轉西元年
-            
-            # 利用 datetime 驗證日期是否存在（如 2月30日會引發 ValueError）
-            target_date = datetime.date(west_year, args.month, args.date)
-            
-            # 驗證成功，回傳輸入的年月日
-            return args.year, args.month, args.date
-
-        except ValueError:
-            # 日期不合法，印出提示並回傳今天的日期
-            print(f"⚠️ 輸入的日期不合法，將自動採用今天的日期：{default_roc_year}年{default_month}月{default_date}日")
-            return default_roc_year, default_month, default_date
-    else:
-        # 參數未完整填寫時，印出提示並回傳今天的日期
-        print(f"ℹ️ 未完整填寫日期參數，將自動採用今天的日期：{default_roc_year}年{default_month}月{default_date}日")
-        return default_roc_year, default_month, default_date
-
 def convert_date_format(date_str):
     # 將「115年7月」或類似格式統一轉換為「115/07」
     match = re.search(r"(\d+)\D+(\d+)", date_str)
@@ -377,7 +334,27 @@ def send_info(ai_req=False):
             EPS公告月份:{stockInfo['selfMonth']}
             """
         discord_sendpost(DISCORD_WEBHOOK_URL, message)
+# ── 參數解析與時間邏輯判定 ──────────────────────────────
+def get_target_date():
+    """
+    fetch input dates (includes year month date), defaults to today if missing or invalid.
+    '-yy', '--year', type=int, help='指定民國年分 (如: 115)'
+    '-mm', '--month', type=int, help='指定月份 (如: 1-12)'
+    '-dd', '--date', type=int, help='指定日期 (如: 1)'
+    """
+    parser = argparse.ArgumentParser(
+        prog='fetcg_notice.py',
+        description='自動抓取證交所公司新聞',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument('-yy', '--year', type=int, help='指定民國年分 (如: 115)')
+    parser.add_argument('-mm', '--month', type=int, help='指定月份 (如: 1-12)')
+    parser.add_argument('-dd', '--date', type=int, help='指定日期 (如: 1)')
+    args = parser.parse_args()
 
+    # 檢查日期輸入(模組)
+    return stockTimer.validate_daily_date(args.year,args.month,args.date,yr_roc=True)
+    
 # ── 執行 ──────────────────────────────
 def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
     with MopsCrawler(timeout=30) as crawler:
