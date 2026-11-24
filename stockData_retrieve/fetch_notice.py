@@ -27,7 +27,7 @@ NOTICE_COLLECTION = os.environ.get("NOTICE_COLLECTION")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL") #webhook
 
 # 資料獲取與解析
-def parse_single_financial_block(block):
+def parse_single_financial_block(block, debug=False):
     """專門解析單一區塊文字的輔助函式"""
     # 1. 事實發生日
     announce_date_str = ""
@@ -43,12 +43,30 @@ def parse_single_financial_block(block):
     company_name = co_match.group(2)
 
     # 3. 財務業務資訊區塊處理
-    fin_pos = block.find("財務業務資訊")
-    if fin_pos != -1:
-        line_end_pos = block.find("\n", fin_pos)
-        fin_block = block[line_end_pos + 1:] if line_end_pos != -1 else block[fin_pos:]
+    # (1) 找到「財務業務資訊」的位置（容許中間有空白或全形字）
+    m_start = re.search(r"財\s*務\s*業\s*務\s*資\s*訊", block)
+    if not m_start:
+        return ""
+
+    after_title = block[m_start.end():]
+
+    # (2) 在標題之後，尋找「結尾冒號」（全形：或半形:）
+    # 實務上通常在開頭 300 字內就會遇到標題結尾的冒號（例如括號說明後的 ):）
+    # 為了避免抓到太遠後面段落的冒號，先在合理範圍內找最後一個冒號，找不到再退而求其次找第一個冒號
+    search_window = after_title[:400]
+    colon_matches = list(re.finditer(r"[：:]", search_window))
+
+    if colon_matches:
+        # 取這段說明結尾的冒號（通常是該標題句最後一個冒號）
+        last_colon = colon_matches[-1]
+        content = search_window[last_colon.end():] + after_title[400:]
     else:
-        fin_block = block
+        # 如果完全沒冒號，就退而求其次：從下一個換行之後開始抓
+        nl_pos = after_title.find("\n")
+        content = after_title[nl_pos + 1:] if nl_pos != -1 else after_title
+
+    # (3) 清理開頭多餘的空白、換行或單獨殘留的右括號
+    fin_block = re.sub(r"^[\s\u3000）\)]+", "", content).strip()
 
     # 4. 自結算月份
     month_str = ""
@@ -60,6 +78,9 @@ def parse_single_financial_block(block):
     eps_val = ""
     pattern = r"每股[\s\S]{0,15}?盈餘[\s\S]*?([-\(\)\（\）\.\d]*\d[-\(\)\（\）\.\d]*)" # 因應每股盈餘中間多出文字的部分
     eps_match = re.search(pattern, fin_block)
+    if debug:
+        print(eps_match)
+        
     if eps_match:
         raw_eps = eps_match.group(1).strip()
         eps_val = convert_negative_number(raw_eps)
@@ -79,7 +100,7 @@ def parse_single_financial_block(block):
     }
     
 
-def execute_notice_mops_data(driver, wait, year, month, day):
+def execute_notice_mops_data(driver, wait, year, month, day, debug=False):
     """執行 MOPS 查詢，邊爬邊即時 upsert 寫入 MongoDB，避免記憶體爆掉"""
     main_window = driver.current_window_handle
     driver.get("https://mops.twse.com.tw/mops/#/web/t05st02")
@@ -140,8 +161,10 @@ def execute_notice_mops_data(driver, wait, year, month, day):
             #return
             exit()
 
-        print(f"📋 共找到 {len(target_indices)} 筆符合條件的新聞，開始邊爬邊寫入 MongoDB...")
-
+        print(f"📋 共找到 {len(target_indices)} 筆符合條件的新聞")
+        if debug:
+            print("除錯模式: 將開始確認fetching 內容")
+            
         # 2. 迴圈：抓取單筆 -> 解析單筆 -> 即時 Upsert
         for target_index in target_indices:
             try:
@@ -167,7 +190,7 @@ def execute_notice_mops_data(driver, wait, year, month, day):
                     detail_content = driver.execute_script("return document.body.innerText")
                     
                     # 解析單篇內容成 Dict
-                    single_data = parse_single_financial_block(detail_content)
+                    single_data = parse_single_financial_block(detail_content, debug)
                     
                     if single_data and single_data.get("sid"):
                         # 即時進行 Upsert 寫入資料庫
@@ -178,8 +201,9 @@ def execute_notice_mops_data(driver, wait, year, month, day):
                             "selfMonth": single_data["selfMonth"]
                         }
                         #collection.update_one(filter_query, {"$set": single_data}, upsert=True)
-                        upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
-                        print(f" 公司 {single_data['sid']} ({single_data['sname']}) 資料已同步！")
+                        if not debug:
+                            upsertDB_byQuery(DB_NAME, NOTICE_COLLECTION, {"$set": single_data}, filter_query)
+                            print(f" 公司 {single_data['sid']} ({single_data['sname']}) 資料已同步！")
                     
                     driver.close()
                     driver.switch_to.window(main_window)
@@ -300,21 +324,21 @@ def send_info(ai_req=False):
         discord_sendpost(DISCORD_WEBHOOK_URL, message)
 
 # ── 執行 ──────────────────────────────
-def fetch_note(mops_year: str, mops_month: str, mops_day:str):
+def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
     with MopsCrawler(timeout=30) as crawler:
         driver = crawler.driver
         wait=crawler.wait
         try:
-            execute_notice_mops_data(driver, wait, mops_year, mops_month, mops_day)
+            execute_notice_mops_data(driver, wait, mops_year, mops_month, mops_day, debug_mode)
         finally:
             crawler.close()
+            if not debug_mode:
+                send_info()
 
-##  debug
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
-    #date_str = f"{yyyy}/{mmmm:02d}/{dddd:02d}"
-    fetch_note(yyyy, mmmm, dddd)
-    send_info()
+    debug_mode=False ##  debug
+    fetch_note(yyyy, mmmm, dddd, debug_mode)
     
 
            
