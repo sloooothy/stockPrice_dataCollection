@@ -13,10 +13,7 @@ import time
 from datetime import datetime
 
 import os
- 
-# -----------------------------------------------------------------------------
-# 1. 日資料抓取與清洗 (TWSE 行情 + 三大法人) -> 對應 dailyData
-# -----------------------------------------------------------------------------
+
 OUTPUT_COLUMNS = [
     "sid",
     "closePrice",
@@ -29,10 +26,20 @@ OUTPUT_COLUMNS = [
     "market",
 ]
 
-
 def _empty_standard_df() -> pd.DataFrame:
     return pd.DataFrame(columns=OUTPUT_COLUMNS)
-
+    
+def _parse_numeric_series(series: pd.Series) -> pd.Series:
+    cleaned = (
+        series.astype(str)
+        .str.replace(",", "", regex=False)
+        .str.replace("--", "0", regex=False)
+        .str.strip()
+    )
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0)
+# -----------------------------------------------------------------------------
+# 1. 日資料抓取與清洗 (TWSE 行情 + 三大法人) -> 對應 dailyData
+# -----------------------------------------------------------------------------
 
 def fetch_twse_daily_data(fetcher, target_date_str: str, debug_mode: bool = False) -> pd.DataFrame:
     """抓取指定日期（YYYYMMDD）的 TWSE 每日行情與三大法人籌碼，回傳標準 DataFrame"""
@@ -140,8 +147,116 @@ def fetch_twse_daily_data(fetcher, target_date_str: str, debug_mode: bool = Fals
 
     return df[OUTPUT_COLUMNS]
 
+# -----------------------------------------------------------------------------
+# 2. 日資料抓取與清洗 (OTC 行情 + 三大法人) -> 對應 dailyData
+# -----------------------------------------------------------------------------
+def fetch_otc_daily_data(fetcher, target_date_str: str, debug_mode: bool = False) -> pd.DataFrame:
+    """抓取指定日期的 OTC 每日行情與三大法人籌碼，回傳標準 DataFrame（priceDate 為西元 YYYYMMDD）"""
+    dt = datetime.strptime(target_date_str, "%Y%m%d")
+    date_str_twse = dt.strftime("%Y%m%d")
+    date_str_otc = dt.strftime("%Y/%m/%d")
 
-def fetch_otc_daily_data(fetcher, debug_mode: bool = False) -> pd.DataFrame:
+    df_p = pd.DataFrame()
+    df_c = pd.DataFrame()
+
+    # 1. OTC 每日行情
+    url_price = (
+        f"https://www.tpex.org.tw/www/zh-tw/afterTrading/otc"
+        f"?date={date_str_otc}&type=EW&id=&response=json&order=0&sort=asc"
+    )
+    try:
+        data_p = fetcher.req_json(url_price)
+        tables_p = data_p.get("tables") if isinstance(data_p, dict) else None
+        if tables_p and len(tables_p) > 0:
+            raw_p = tables_p[0]
+            clean_fields = [str(col).strip() for col in raw_p.get("fields", [])]
+            df_raw = pd.DataFrame(raw_p.get("data", []), columns=clean_fields)
+
+            if debug_mode:
+                print("OTC price columns:", df_raw.columns.tolist())
+
+            field_mapping = {
+                "sid": "代號",
+                "closePrice": "收盤",
+                "ttlVolume": "成交股數",
+                "priceChange": "漲跌",
+            }
+            raw_sid_col = field_mapping["sid"]
+            if raw_sid_col in df_raw.columns:
+                df_base = df_raw[df_raw[raw_sid_col].notna()].copy()
+                df_base[raw_sid_col] = df_base[raw_sid_col].astype(str).str.strip()
+                df_base = df_base[df_base[raw_sid_col] != ""].copy()
+
+                df_p = df_base[list(field_mapping.values())].copy()
+                df_p.columns = list(field_mapping.keys())
+                df_p["sid"] = df_p["sid"].astype(str).str.strip()
+                df_p["priceChange"] = df_p["priceChange"].apply(parse_price_change)
+
+                for col in ["closePrice", "ttlVolume", "priceChange"]:
+                    df_p[col] = _parse_numeric_series(df_p[col])
+            else:
+                print(f"OTC 每日行情缺少代號欄位，使用日期:{date_str_otc}")
+        else:
+            print(f"OTC 每日行情無資料，使用日期:{date_str_otc}")
+    except Exception as e:
+        print(f"Error fetching OTC price for {date_str_otc}: {e}")
+    finally:
+        time.sleep(3)
+
+    # 2. OTC 三大法人籌碼（依明細欄位索引：外資合計買賣超=10、投信買賣超=13、自營商合計買賣超=22）
+    url_chip = (
+        f"https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade"
+        f"?type=Daily&sect=AL&date={date_str_otc}&id=&response=json"
+    )
+    try:
+        data_c = fetcher.req_json(url_chip)
+        tables_c = data_c.get("tables") if isinstance(data_c, dict) else None
+        if tables_c and len(tables_c) > 0:
+            raw_c = tables_c[0]
+            rows_c = raw_c.get("data") or []
+            if rows_c:
+                chip_rows = []
+                for row in rows_c:
+                    sid = str(row[0]).strip() if len(row) > 0 else ""
+                    if not sid:
+                        continue
+                    chip_rows.append({
+                        "sid": sid,
+                        "foreignNetBuy": row[10] if len(row) > 10 else 0,
+                        "trustNetBuy": row[13] if len(row) > 13 else 0,
+                        "dealerNetBuy": row[22] if len(row) > 22 else 0,
+                    })
+
+                df_c = pd.DataFrame(chip_rows)
+                if not df_c.empty:
+                    df_c["sid"] = df_c["sid"].astype(str).str.strip()
+                    for col in ["foreignNetBuy", "trustNetBuy", "dealerNetBuy"]:
+                        df_c[col] = _parse_numeric_series(df_c[col])
+            else:
+                print(f"OTC 三大法人籌碼無資料，使用日期:{date_str_otc}")
+        else:
+            print(f"OTC 三大法人籌碼無資料，使用日期:{date_str_otc}")
+    except Exception as e:
+        print(f"Error fetching OTC chip for {date_str_otc}: {e}")
+    finally:
+        time.sleep(3)
+
+    if df_p.empty or df_c.empty:
+        return _empty_standard_df()
+
+    df = pd.merge(df_p, df_c, on="sid", how="left").fillna(0)
+    df["priceDate"] = date_str_twse
+    df["market"] = "OTC"
+    df = df[df["sid"].str.match(r"^\d{4}$")].copy()
+
+    if debug_mode:
+        print(f"OTC 完成 {date_str_otc}：{len(df)} 筆")
+
+    return df[OUTPUT_COLUMNS]
+    
+    
+# otc opendata ==============================================================================
+def fetch_otc_daily_data_recent(fetcher, debug_mode: bool = False) -> pd.DataFrame:
     """抓取最近一期 OTC 每日行情與三大法人籌碼，回傳標準 DataFrame（priceDate 為西元 YYYYMMDD）"""
     otc_price = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
     otc_chip = "https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading"
@@ -245,19 +360,21 @@ def fetch_otc_daily_data(fetcher, debug_mode: bool = False) -> pd.DataFrame:
 
     return df[OUTPUT_COLUMNS]
 
-
-def retrive_daily_data(target_date_str: str, debug_mode: bool = False) -> pd.DataFrame:
+#===========================================================================================merge
+def retrieve_daily_data(target_date_str: str, debug_mode: bool = False) -> pd.DataFrame:
     """
     整合 TWSE 與 OTC 每日資料：確認兩邊日期與目標日期一致後再合併回傳。
     若 OTC 尚未更新或日期不符，則不混入舊資料（可依需求改為只回傳 TWSE）。
     """
     fetcher = ReqFetcher.ReqFetcher(timeout=10)
-    formatted_date = datetime.strptime(target_date_str, "%Y%m%d").strftime("%Y%m%d")
+    dt = datetime.strptime(target_date_str, "%Y%m%d")
+    target_ad_str = dt.strftime("%Y%m%d")
 
     df_twse = fetch_twse_daily_data(fetcher, target_date_str, debug_mode=debug_mode)
-    df_otc = fetch_otc_daily_data(fetcher, debug_mode=debug_mode)
+    df_otc = fetch_otc_daily_data(fetcher, target_date_str, debug_mode=debug_mode)
 
     frames = []
+    otc_merged_count = 0
 
     if not df_twse.empty:
         frames.append(df_twse)
@@ -266,15 +383,16 @@ def retrive_daily_data(target_date_str: str, debug_mode: bool = False) -> pd.Dat
         valid_otc_dates = df_otc["priceDate"][df_otc["priceDate"] != ""]
         otc_actual_date = valid_otc_dates.mode().iloc[0] if not valid_otc_dates.empty else ""
 
-        if otc_actual_date == formatted_date:
-            df_otc = df_otc[df_otc["priceDate"] == formatted_date].copy()
+        if otc_actual_date == target_ad_str:
+            df_otc = df_otc[df_otc["priceDate"] == target_ad_str].copy()
             frames.append(df_otc)
+            otc_merged_count = len(df_otc)
             if debug_mode:
-                print(f"日期一致（{formatted_date}），納入 OTC 資料")
+                print(f"日期一致（{target_ad_str}），納入 OTC 資料")
         else:
             print(
                 f"OTC 日期不一致（櫃買實際日期: {otc_actual_date or '未知'}，"
-                f"目標日期: {formatted_date}），略過 OTC 合併"
+                f"目標日期: {target_ad_str}），略過 OTC 合併"
             )
 
     if not frames:
@@ -282,16 +400,14 @@ def retrive_daily_data(target_date_str: str, debug_mode: bool = False) -> pd.Dat
 
     df_all = pd.concat(frames, ignore_index=True)
 
-    # 若你希望「必須 TWSE 與 OTC 兩邊都成功且日期完全一致才算完整一天的合併資料」，
-    # 可以在這裡改為：
-    # if df_twse.empty or otc_actual_date != formatted_date:
+    # 若希望「TWSE 與 OTC 都必須有符合目標日期的資料才合併」，可取消下方註解：
+    # if df_twse.empty or otc_merged_count == 0:
     #     return _empty_standard_df()
 
-    if debug_mode:
-        print(
-            f"完成 {target_date_str}：TWSE {len(df_twse)} 筆、"
-            f"OTC {len(df_otc) if not df_otc.empty else 0} 筆、合計 {len(df_all)} 筆"
-        )
+    print(
+            f"完成 {target_ad_str}：TWSE {len(df_twse)} 筆、"
+            f"OTC {otc_merged_count} 筆、合計 {len(df_all)} 筆"
+    )
 
     return df_all
     
@@ -434,7 +550,7 @@ def fetch_daily_data(debug=False):
     yyyy,mmmm,dddd=stockTimer.validate_daily_date(args.year,args.month,args.day)
     target_date_str=f"{yyyy}{mmmm}{dddd}"
     # 取得本日大盤資料
-    res=retrive_daily_data(target_date_str, debug)
+    res=retrieve_daily_data(target_date_str, debug)
         
     # 寫入DB
     load_dotenv()
@@ -443,7 +559,7 @@ def fetch_daily_data(debug=False):
     if not debug:
         file_res=  save_pddata_to_json(res,file_prefix=DAILY_COLLECTION,date_suffix=target_date_str)  
         if file_res: 
-            print(f"寫入檔案成功: {DAILY_COLLECTION}{target_date_str}.json")
+            print(f"寫入檔案成功: {DAILY_COLLECTION}_{target_date_str}.json")
             
         db_res=writeDB_byPD(DB_NAME, DAILY_COLLECTION, pdframe=res, indexlist=['sid','priceDate'])
         if db_res: 

@@ -37,6 +37,7 @@
 * `foreignNetBuy` - 外陸資買賣超股數(不含外資自營商)
 * `trustNetBuy`  - 投信買賣超股數
 * `dealerNetBuy` - 自營商買賣超股數
+* `market` - 市場別
 
 ---
 
