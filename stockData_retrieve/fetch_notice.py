@@ -296,12 +296,11 @@ def convert_negative_number(num_str):
 # ── 資料通知 (Discord)──────────────────────────────
 def send_info(yyyy,mmmm,dddd,ai_req=False):
     if yyyy is not None and mmmm is not None and dddd is not None:
-        date_str=f"{yyyy}/{mmmm}/{mmmm}"
+        date_str=f"{yyyy}/{mmmm}/{dddd}"
     else: #未指定今日日期作為寫入日期
         today = datetime.date.today()
         roc_year = today.year - 1911
         date_str=f"{roc_year}/{today.strftime('%m/%d')}"
-        
     query={
         "noticeDate": f"{date_str}",
     }
@@ -326,6 +325,7 @@ def send_info(yyyy,mmmm,dddd,ai_req=False):
             ai_analysis=gen_AnalyzedRes(prompt)
             # 組成 Discord 訊息並發送
             message = f"📊 **【台股分析報告】**\n\n{ai_analysis}"
+            
         else:
             message=f"""
             【財務公告訊息】
@@ -357,9 +357,9 @@ def get_target_date():
     # 檢查日期輸入(模組)
     return stockTimer.validate_daily_date(args.year,args.month,args.date,yr_roc=True)
     
-# ── 執行 ──────────────────────────────
+# ── enter point──────────────────────────────
 def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
-    with MopsCrawler(headless=not debug_mode,timeout=30) as crawler:
+    with MopsCrawler(timeout=30) as crawler:
         driver = crawler.driver
         wait=crawler.wait
         try:
@@ -368,7 +368,7 @@ def fetch_note(mops_year: str, mops_month: str, mops_day:str, debug_mode):
             crawler.close()
             if not debug_mode:
                 send_info(mops_year, mops_month, mops_day)
-
+# ── 執行 ──────────────────────────────
 if __name__ == "__main__":
     yyyy, mmmm, dddd=get_target_date()
     debug_mode=False ##  debug
