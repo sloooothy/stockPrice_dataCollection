@@ -556,7 +556,7 @@ def fetch_daily_data(debug=False):
     load_dotenv()
     DB_NAME = os.environ.get("DB_NAME")
     DAILY_COLLECTION = os.environ.get("DAILY_COLLECTION")
-    if not debug:
+    if not debug and not res.empty:
         file_res=  save_pddata_to_json(res,file_prefix=DAILY_COLLECTION,date_suffix=target_date_str)  
         if file_res: 
             print(f"寫入檔案成功: {DAILY_COLLECTION}_{target_date_str}.json")
