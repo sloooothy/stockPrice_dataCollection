@@ -548,7 +548,7 @@ def fetch_daily_data(debug=False):
     
     # 進行輸入檢查
     yyyy,mmmm,dddd=stockTimer.validate_daily_date(args.year,args.month,args.day)
-    target_date_str=f"{yyyy}{mmmm}{dddd}"
+    target_date_str = f"{yyyy:04d}{mmmm:02d}{dddd:02d}"
     # 取得本日大盤資料
     res=retrieve_daily_data(target_date_str, debug)
         
