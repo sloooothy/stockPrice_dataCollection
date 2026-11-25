@@ -2,7 +2,8 @@ name: Notice News fetching Sync
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5' # 台灣時間每週一至週五晚上 8:00 執行
+    # 原本 UTC 12:00（台灣週一至五 20:00） -> 改為 UTC 12:23（台灣週一至五 20:23）
+    - cron: '23 12 * * 1-5'
   workflow_dispatch:      # 允許手動觸發測試
 
 jobs:
