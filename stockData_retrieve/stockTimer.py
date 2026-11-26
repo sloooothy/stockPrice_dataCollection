@@ -2,8 +2,6 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 import holidays
 
-from ReqFetcher import ReqFetcher
-
 # --- 參數與日期驗證邏輯 ---
 def validate_daily_date(year, month, day, yr_roc=False):
     """
@@ -29,7 +27,7 @@ def validate_daily_date(year, month, day, yr_roc=False):
 
     return get_default_trading_date(roc=yr_roc)
     
-#==================================================================================================================
+#==推算交易日 (for day)==============================================================================================
 def _parse_date(raw: str) -> date | None:
     text = raw.strip().replace("/", "-").replace(".", "-")
     parts = text.split("-")
@@ -92,8 +90,8 @@ def get_default_trading_date(roc: bool = False, max_lookback_days: int = 30) -> 
     now = datetime.now(ZoneInfo("Asia/Taipei"))
     target_date = now.date()
 
-    # 09:00 開盤前先往回一天
-    if now.time() < time(9, 0):
+    # 14:00 當日收關前先往回一天
+    if now.time() < time(14, 0):
         target_date -= timedelta(days=1)
 
     # 往前推到最近一個交易日
