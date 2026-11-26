@@ -48,10 +48,7 @@ def fetch_twse_daily_data(fetcher, target_date_str: str, debug_mode: bool = Fals
     df_c = pd.DataFrame()
 
     # 1. TWSE 每日行情
-    url_price = (
-        f"https://www.twse.com.tw/exchangeReport/MI_INDEX"
-        f"?response=json&date={target_date_str}&type=ALLBUT0999"
-    )
+    url_price = f"https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date={target_date_str}&type=ALLBUT0999"
     try:
         data_p = fetcher.req_json(url_price)
         if data_p and data_p.get("stat") == "OK":
@@ -96,10 +93,8 @@ def fetch_twse_daily_data(fetcher, target_date_str: str, debug_mode: bool = Fals
         time.sleep(3)
 
     # 2. TWSE 三大法人籌碼
-    url_chip = (
-        f"https://www.twse.com.tw/rwd/zh/fund/T86"
-        f"?response=json&date={target_date_str}&selectType=ALLBUT0999"
-    )
+    url_chip = f"https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date={target_date_str}&selectType=ALLBUT0999"
+
     try:
         data_c = fetcher.req_json(url_chip)
         if data_c and data_c.get("stat") == "OK" and "data" in data_c:
@@ -568,6 +563,7 @@ def fetch_daily_data(debug=False):
 if __name__ == "__main__":
     debug_mode=False
     fetch_daily_data(debug_mode)
+    
     
         
         
