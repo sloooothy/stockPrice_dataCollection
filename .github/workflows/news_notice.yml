@@ -1,9 +1,9 @@
 name: Notice News fetching Sync
 
 on:
-  schedule:
+  #schedule: # 改外部觸發排程
     # 原本 UTC 12:00（台灣週一至五 20:00） -> 改為 UTC 12:23（台灣週一至五 20:23）
-    - cron: '23 12 * * 1-5'
+    #- cron: '23 12 * * 1-5'
   workflow_dispatch:      # 允許手動觸發測試
 
 jobs:

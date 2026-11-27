@@ -1,9 +1,9 @@
 name: Daily Stock Data Fetcher
 
 on:
-  schedule:
+  #schedule: # 改外部觸發排程
     # 原本 UTC 09:00（台灣 17:00） -> 改為 UTC 09:17（台灣 17:19）
-    - cron: '19 9 * * *'
+    #- cron: '19 9 * * *'
   workflow_dispatch:
 
 permissions:
